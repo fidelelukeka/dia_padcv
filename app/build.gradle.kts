@@ -87,6 +87,7 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.ui)
     implementation(libs.androidx.compose.runtime)
+    implementation(libs.androidx.foundation)
 
     // Testing
     testImplementation(libs.junit)
@@ -154,7 +155,6 @@ dependencies {
     implementation(libs.exposed.javatime)
 
 
-// MySQL JDBC
     implementation(libs.mysql.driver)
 
     // HikariCP (pool de connexions)

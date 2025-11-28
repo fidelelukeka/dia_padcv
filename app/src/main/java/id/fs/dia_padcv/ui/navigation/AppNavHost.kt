@@ -1,9 +1,24 @@
+import android.content.res.Configuration
 import android.util.Log
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Inventory
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -22,7 +37,7 @@ fun AppNavHost(
         // -------- LOGIN --------
         composable("login") {
             LoginScreen(viewModel = appViewModel) {
-                navController.navigate("distributions") {
+                navController.navigate("home") {
                     popUpTo("login") { inclusive = true }
                 }
             }
@@ -39,52 +54,102 @@ fun AppNavHost(
 
         // -------- HOME --------
         composable("home") {
-            Column(
+            val configuration = LocalConfiguration.current
+            val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            val columns = if (isLandscape) 4 else 2
+
+            val buttonColors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF4CAF50), // Vert vif
+                contentColor = Color.White
+            )
+            val buttonShape = RoundedCornerShape(8.dp) // Coins modérés
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(columns),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(24.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text("Bienvenue ! Choisissez une option", style = MaterialTheme.typography.titleLarge)
+                item(span = { GridItemSpan(columns) }) {
+                    Text(
+                        "Bienvenue ! Choisissez une option",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                item {
+                    Button(
+                        onClick = { navController.navigate("beneficiaire") },
+                        modifier = Modifier.fillMaxWidth().height(80.dp),
+                        colors = buttonColors,
+                        shape = buttonShape
+                    ) {
+                        Icon(Icons.Default.Person, contentDescription = "Bénéficiaires")
+                        Spacer(Modifier.width(8.dp))
+                        Text("Gérer les bénéficiaires")
+                    }
+                }
 
-                Button(
-                    onClick = { navController.navigate("beneficiaire") },
-                    modifier = Modifier.fillMaxWidth().height(50.dp)
-                ) { Text("Gérer les bénéficiaires") }
+                item {
+                    Button(
+                        onClick = { navController.navigate("distributions") },
+                        modifier = Modifier.fillMaxWidth().height(80.dp),
+                        colors = buttonColors,
+                        shape = buttonShape
+                    ) {
+                        Icon(Icons.Default.List, contentDescription = "Distributions")
+                        Spacer(Modifier.width(8.dp))
+                        Text("Gérer les distributions")
+                    }
+                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                item {
+                    Button(
+                        onClick = {
+                            Log.d("Navigation", "Bouton Entrepôt cliqué")
+                            navController.navigate("entrepot")
+                        },
+                        modifier = Modifier.fillMaxWidth().height(80.dp),
+                        colors = buttonColors,
+                        shape = buttonShape
+                    ) {
+                        Icon(Icons.Default.Home, contentDescription = "Entrepôt")
+                        Spacer(Modifier.width(8.dp))
+                        Text("Enregistrer un entrepôt")
+                    }
+                }
 
-                Button(
-                    onClick = { navController.navigate("distributions") },
-                    modifier = Modifier.fillMaxWidth().height(50.dp)
-                ) { Text("Gérer les distributions") }
+                item {
+                    Button(
+                        onClick = { navController.navigate("package") },
+                        modifier = Modifier.fillMaxWidth().height(80.dp),
+                        colors = buttonColors,
+                        shape = buttonShape
+                    ) {
+                        Icon(Icons.Default.Inventory, contentDescription = "Colis")
+                        Spacer(Modifier.width(8.dp))
+                        Text("Enregistrer un colis")
+                    }
+                }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = {
-                        Log.d("Navigation", "Bouton Entrepôt cliqué")
-                        navController.navigate("entrepot")
-                    },
-                    modifier = Modifier.fillMaxWidth().height(50.dp)
-                ) { Text("Enregistrer un entrepôt") }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = { navController.navigate("package") },
-                    modifier = Modifier.fillMaxWidth().height(50.dp)
-                ) { Text("Enregistrer un colis") }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = { navController.navigate("sync") },
-                    modifier = Modifier.fillMaxWidth().height(50.dp)
-                ) { Text("Synchroniser") }
+                item {
+                    Button(
+                        onClick = { navController.navigate("sync") },
+                        modifier = Modifier.fillMaxWidth().height(80.dp),
+                        colors = buttonColors,
+                        shape = buttonShape
+                    ) {
+                        Icon(Icons.Default.Sync, contentDescription = "Synchroniser")
+                        Spacer(Modifier.width(8.dp))
+                        Text("Synchroniser")
+                    }
+                }
             }
         }
 
