@@ -888,7 +888,7 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
         npk = kgNpk,
         suggestion = suggestion,
         warehouseId = siteId,
-        beneficiarieId = beneficiarieId,
+//        beneficiarieId = beneficiarieId,
         usersId = usersId,
         latitudeWrhs = latitude?.toDoubleOrNull(),
         longitudeWrhs = longitude?.toDoubleOrNull(),

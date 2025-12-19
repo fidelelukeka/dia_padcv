@@ -128,28 +128,6 @@ fun StepResume(viewModel: AppViewModel, onSubmit: (() -> Unit)? = null) {
         StepTitle("Commentaires")
         SummaryItem("Suggestions", distribution.suggestion)
 
-        // --- Aperçu JSON avant soumission ---
-        StepTitle("Aperçu des données à envoyer")
-        val gson = remember { Gson() }
-        val jsonPreview = remember(distribution) { gson.toJson(distribution) }
-
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(8.dp)
-        ) {
-            Text(
-                text = "Payload (JSON)",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = jsonPreview,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-        }
-
-        // Bouton soumission
         // Bouton soumission
         Button(
             onClick = {

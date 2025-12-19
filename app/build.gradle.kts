@@ -22,13 +22,30 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // ✅ Active R8 (remplace ProGuard)
+            isMinifyEnabled = true
+
+            // ✅ Supprime les ressources inutilisées
+            isShrinkResources = true
+
+            // ✅ Fichiers de règles ProGuard/R8
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
         }
+        debug {
+            // Pas besoin de minification en debug
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
     }
+
+    // ✅ Optimisation des ressources vectorielles
+    buildFeatures {
+        compose = true
+    }
+
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -40,10 +57,6 @@ android {
             jvmTarget.set(JvmTarget.JVM_11)
             freeCompilerArgs.add("-Xjvm-default=all")
         }
-    }
-
-    buildFeatures {
-        compose = true
     }
 
     composeOptions {

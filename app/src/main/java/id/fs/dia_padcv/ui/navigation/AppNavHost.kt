@@ -100,10 +100,10 @@ fun AppNavHost(
                     Button(
                         onClick = { navController.navigate("distributions") },
                         modifier = Modifier.fillMaxWidth().height(80.dp),
-                        colors = buttonColors,
-                        shape = buttonShape
+                        shape = buttonShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
-                        Icon(Icons.Default.List, contentDescription = "Distributions")
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Distributions")
                         Spacer(Modifier.width(8.dp))
                         Text("Gérer les distributions")
                     }
@@ -116,7 +116,10 @@ fun AppNavHost(
                             navController.navigate("entrepot")
                         },
                         modifier = Modifier.fillMaxWidth().height(80.dp),
-                        colors = buttonColors,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFFFEB3B), // Jaune
+                            contentColor = Color.Black
+                        ),
                         shape = buttonShape
                     ) {
                         Icon(Icons.Default.Home, contentDescription = "Entrepôt")
@@ -129,7 +132,10 @@ fun AppNavHost(
                     Button(
                         onClick = { navController.navigate("package") },
                         modifier = Modifier.fillMaxWidth().height(80.dp),
-                        colors = buttonColors,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFF44336), // Rouge
+                            contentColor = Color.White
+                        ),
                         shape = buttonShape
                     ) {
                         Icon(Icons.Default.Inventory, contentDescription = "Colis")
@@ -142,7 +148,10 @@ fun AppNavHost(
                     Button(
                         onClick = { navController.navigate("sync") },
                         modifier = Modifier.fillMaxWidth().height(80.dp),
-                        colors = buttonColors,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2596BE), // Bleu personnalisé
+                            contentColor = Color.White
+                        ),
                         shape = buttonShape
                     ) {
                         Icon(Icons.Default.Sync, contentDescription = "Synchroniser")

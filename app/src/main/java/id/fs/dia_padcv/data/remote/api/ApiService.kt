@@ -208,7 +208,7 @@ data class DistributionRequest(
     @SerializedName("npk") val npk: Int?,
     @SerializedName("suggestion") val suggestion: String?,
     @SerializedName("warehouse_id") val warehouseId: Int,
-    @SerializedName("beneficiarie_id") val beneficiarieId: Int? = null, // ⚡ optionnel
+//    @SerializedName("beneficiarie_id") val beneficiarieId: Int? = null, // ⚡ optionnel
     @SerializedName("users_id") val usersId: Int,
     @SerializedName("latitude_wrhs") val latitudeWrhs: Double?,
     @SerializedName("longitude_wrhs") val longitudeWrhs: Double?,
@@ -290,7 +290,7 @@ interface ApiService {
     @GET("users/readAllSites.php")
     suspend fun getSites(): Response<SiteResponse>
 
-    @POST("survey_dist/create.php")
+    @POST("survey_dist/creates.php")
     suspend fun createDistribution(
         @Body distribution: DistributionRequest
     ): Response<DistributionResponse>

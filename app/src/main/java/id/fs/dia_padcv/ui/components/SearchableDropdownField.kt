@@ -1,8 +1,5 @@
 package id.fs.dia_padcv.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,9 +11,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * 🔍 Composable générique pour recherche et sélection dynamique
- * avec animation fluide de la liste filtrée
- * Utilise uniquement les icônes natives préconfigurées
+ * 🔍 Composable hybride :
+ * - champ de recherche filtrant
+ * - dropdown select au clic
+ * - fallback sur récents ou 10 items par défaut
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,17 +24,19 @@ fun <T> SearchableDropdownField(
     selectedItem: T?,
     itemLabel: (T) -> String,
     onItemSelected: (T) -> Unit,
-    onClearSelection: () -> Unit
+    onClearSelection: () -> Unit,
+    recentItems: List<T> = emptyList()
 ) {
     var searchText by remember { mutableStateOf("") }
+    var expanded by remember { mutableStateOf(false) }
 
-    val filteredItems = remember(searchText, items) {
-        if (searchText.isBlank()) emptyList()
-        else items.filter { itemLabel(it).contains(searchText, ignoreCase = true) }
-    }
-
-    LaunchedEffect(searchText) {
-        if (searchText.isBlank()) onClearSelection()
+    val filteredItems = remember(searchText, items, recentItems) {
+        when {
+            searchText.isBlank() -> {
+                if (recentItems.isNotEmpty()) recentItems else items.take(10)
+            }
+            else -> items.filter { itemLabel(it).contains(searchText, ignoreCase = true) }
+        }
     }
 
     Column {
@@ -45,9 +45,12 @@ fun <T> SearchableDropdownField(
             onValueChange = {
                 searchText = it
                 if (selectedItem != null) onClearSelection()
+                expanded = true // ouvre le menu dès qu’on tape
             },
             label = { Text(label) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = true }, // ouvre aussi au clic
             trailingIcon = {
                 if (searchText.isNotEmpty() || selectedItem != null) {
                     Text(
@@ -56,35 +59,31 @@ fun <T> SearchableDropdownField(
                             .clickable {
                                 searchText = ""
                                 onClearSelection()
+                                expanded = false
                             }
                             .padding(horizontal = 8.dp)
                     )
                 }
-            }
+            },
+            readOnly = false // 🔑 permet la saisie
         )
 
-        AnimatedVisibility(
-            visible = filteredItems.isNotEmpty() && selectedItem == null,
-            enter = expandVertically(),
-            exit = shrinkVertically()
+        DropdownMenu(
+            expanded = expanded && filteredItems.isNotEmpty(),
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 200.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 150.dp)
-            ) {
-                filteredItems.forEach { item ->
-                    Text(
-                        text = itemLabel(item),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(4.dp)
-                            .clickable {
-                                onItemSelected(item)
-                                searchText = itemLabel(item)
-                            }
-                    )
-                }
+            filteredItems.forEach { item ->
+                DropdownMenuItem(
+                    text = { Text(itemLabel(item)) },
+                    onClick = {
+                        onItemSelected(item)
+                        searchText = itemLabel(item)
+                        expanded = false
+                    }
+                )
             }
         }
     }
