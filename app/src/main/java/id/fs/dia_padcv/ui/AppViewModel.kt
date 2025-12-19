@@ -41,7 +41,6 @@ import id.fs.dia_padcv.data.remote.api.WarehouseRequest
 import id.fs.dia_padcv.data.remote.api.RetrofitClient
 import id.fs.dia_padcv.data.remote.api.Site
 import id.fs.dia_padcv.data.remote.api.Warehouse
-import id.fs.dia_padcv.data.remote.db.insertDistribution
 import java.time.LocalDate
 
 
@@ -980,26 +979,6 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
             }
         }
     }
-
-
-
-    fun saveDistributionToDb(distribution: Distribution) {
-        insertDistribution(
-            maize = distribution.kgMais,
-            rice = distribution.kgRiz,
-            cassava = distribution.kgManioc,
-            soybean = distribution.kgSoja,
-            dap = distribution.kgDap,
-            kcl = distribution.kgKcl,
-            uree = distribution.kgUree,
-            npkVal = distribution.kgNpk,
-            suggestionVal = distribution.suggestion,
-            warehouse = distribution.siteId,
-            beneficiary = 1,
-            user = 3
-        )
-    }
-
 
     private val _sitesRoom = MutableStateFlow<List<SiteEntity>>(emptyList())
     val sitesRoom: StateFlow<List<SiteEntity>> = _sitesRoom
