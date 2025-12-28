@@ -38,7 +38,9 @@ fun EntrepotScreen(
 
     val villages by viewModel.villages.collectAsState(initial = emptyList())
     val selectedVillage by viewModel.selectedVillage
-    val filteredVillages = villages.filter { it.name_village.contains(villageSearch, ignoreCase = true) }
+    val filteredVillages = villages.filter {
+        it.nom_village?.contains(villageSearch, ignoreCase = true) == true
+    }
 
     val (locationState, fetchLocation, isLoadingLocation) = useLocation()
     val context = LocalContext.current
@@ -62,11 +64,6 @@ fun EntrepotScreen(
             val savedUri = saveGalleryImageToLocal(context, it)
             imageUris.add(savedUri)
         }
-    }
-
-    // 🔹 Charger les villages au démarrage
-    LaunchedEffect(Unit) {
-        viewModel.fetchVillages(context)
     }
 
     LazyColumn(
@@ -100,8 +97,8 @@ fun EntrepotScreen(
                 label = "Rechercher un village",
                 items = villages,
                 selectedItem = selectedVillage,
-                itemLabel = { it.name_village },
-                onItemSelected = { village -> viewModel.selectVillage(village) },
+                itemLabel = { it.toString() },
+                onItemSelected = { village -> viewModel.selectVillage(village as Village) },
                 onClearSelection = { viewModel.clearSelectedVillage() }
             )
         }
@@ -170,7 +167,6 @@ fun EntrepotScreen(
                     photoPath = imageUris.joinToString(",") { it.toString() }
                 )
 
-                viewModel.addEntrepot(context, entrepot)
                 viewModel.createWarehouseFromEntrepot(context, entrepot) // 🔹 API + compression
                 onBack()
             }, modifier = Modifier.fillMaxWidth()) {

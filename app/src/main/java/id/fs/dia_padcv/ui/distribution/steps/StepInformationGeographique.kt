@@ -84,7 +84,7 @@ fun StepInformationGeographique(viewModel: AppViewModel) {
 
     // Charger les sites au démarrage
     LaunchedEffect(Unit) {
-        viewModel.fetchSites(context)
+        viewModel.sites
     }
 
     Column(

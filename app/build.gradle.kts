@@ -16,7 +16,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.1.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -101,6 +101,7 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.foundation)
+    implementation(libs.androidx.foundation.layout)
 
     // Testing
     testImplementation(libs.junit)
@@ -172,4 +173,13 @@ dependencies {
 
     // HikariCP (pool de connexions)
     implementation(libs.hikari.cp)
+
+    // WorkManager (si tu utilises la version auto)
+    implementation(libs.androidx.work.runtime.ktx)
+
+    // Lottie (optional, pour animation stylise)
+    implementation(libs.lottie.compose)
+
+    // Data Store
+    implementation(libs.androidx.datastore.preferences)
 }

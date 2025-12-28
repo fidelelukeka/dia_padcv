@@ -1,5 +1,8 @@
 package id.fs.dia_padcv.ui
 
+// Entités locales Room
+
+// Classes API
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
@@ -12,36 +15,41 @@ import androidx.annotation.RequiresApi
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.core.net.toUri
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import id.fs.dia_padcv.data.repository.AppRepository
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
-import java.io.ByteArrayOutputStream
-import java.io.File
-import androidx.core.net.toUri
-
-// Entités locales Room
 import id.fs.dia_padcv.data.local.entities.Beneficiary
 import id.fs.dia_padcv.data.local.entities.Colis
 import id.fs.dia_padcv.data.local.entities.Distribution
 import id.fs.dia_padcv.data.local.entities.Entrepot
 import id.fs.dia_padcv.data.local.entities.SiteEntity
-
-// Classes API
-import id.fs.dia_padcv.data.remote.api.Village as ApiVillage
+import id.fs.dia_padcv.data.local.entities.Village
 import id.fs.dia_padcv.data.remote.api.BeneficiaryRequest
 import id.fs.dia_padcv.data.remote.api.ColisRequest
+import id.fs.dia_padcv.data.remote.api.DistributionDeleteRequest
 import id.fs.dia_padcv.data.remote.api.DistributionRequest
-import id.fs.dia_padcv.data.remote.api.WarehouseRequest
 import id.fs.dia_padcv.data.remote.api.RetrofitClient
-import id.fs.dia_padcv.data.remote.api.Site
 import id.fs.dia_padcv.data.remote.api.Warehouse
+import id.fs.dia_padcv.data.remote.api.WarehouseRequest
+import id.fs.dia_padcv.data.repository.AppRepository
+import id.fs.dia_padcv.ui.utils.LoginResult
+import id.fs.dia_padcv.ui.utils.SyncResult
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
+import java.io.File
 import java.time.LocalDate
+import id.fs.dia_padcv.data.remote.api.Village as ApiVillage
 
 
 class AppViewModel(private val repository: AppRepository) : ViewModel() {
@@ -58,63 +66,52 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
 
     fun login(context: Context, username: String, password: String) {
         viewModelScope.launch {
+            Log.d("ViewModel", "▶️ Début login: username=$username")
             _isLoading.value = true
             _loginError.value = null
-            try {
-                val success = repository.login(username, password)
-                if (success) {
+
+            val passwordHash = password
+
+            when (val result = repository.login(context, username, passwordHash)) {
+                is LoginResult.Success -> {
+                    Log.d("ViewModel", "✅ Login réussi: ${result.user.username} / ${result.user.role}")
                     _isLoggedIn.value = true
-                    Toast.makeText(context, "✅ Connexion réussie", Toast.LENGTH_SHORT).show()
-                    Log.i("AppViewModel", "✅ Connexion réussie pour $username")
-                } else {
-                    _loginError.value = "Nom d’utilisateur ou mot de passe incorrect."
-                    Toast.makeText(context, "⚠️ Nom d’utilisateur ou mot de passe incorrect", Toast.LENGTH_SHORT).show()
                 }
-            } catch (e: Exception) {
-                _loginError.value = e.message ?: "Erreur inconnue."
-                Toast.makeText(context, "❌ Erreur login: ${e.message}", Toast.LENGTH_LONG).show()
-                Log.e("AppViewModel", "❌ Exception login", e)
-            } finally {
-                _isLoading.value = false
+                LoginResult.InvalidCredentials -> {
+                    Log.e("ViewModel", "❌ Identifiants invalides pour $username")
+                    _loginError.value = "Nom d’utilisateur ou mot de passe incorrect."
+                }
+                LoginResult.NetworkError -> {
+                    Log.e("ViewModel", "❌ Réseau indisponible pour $username")
+                    _loginError.value = "Connexion impossible : réseau indisponible."
+                }
             }
+
+            _isLoading.value = false
+            Log.d("ViewModel", "🏁 Fin login: username=$username, isLoggedIn=${_isLoggedIn.value}")
         }
     }
 
-    // ------------------ DISTRIBUTIONS ------------------
-//    val distributions: Flow<List<Distribution>> = repository.distributions
-//    fun addDistribution(d: Distribution) = viewModelScope.launch { repository.insertDistribution(d) }
-//    fun removeDistribution(d: Distribution) = viewModelScope.launch { repository.deleteDistribution(d) }
-
-    // ------------------ VILLAGES ------------------
-    private val _villages = MutableStateFlow<List<ApiVillage>>(emptyList())
-    val villages: StateFlow<List<ApiVillage>> = _villages
-
-    private val _selectedVillage = mutableStateOf<ApiVillage?>(null)
-    val selectedVillage: State<ApiVillage?> = _selectedVillage
-
-    fun selectVillage(village: ApiVillage) {
-        _selectedVillage.value = village
-        Log.i("AppViewModel", "🏡 Village sélectionné : ${village.name_village}")
-    }
-
-    fun clearSelectedVillage() {
-        _selectedVillage.value = null
-    }
-
-    fun fetchVillages(context: Context) {
-        viewModelScope.launch {
-            try {
-                val list = repository.fetchVillages()
-                _villages.value = list
-                Toast.makeText(context, "✅ ${list.size} villages récupérés", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                _villages.value = emptyList()
-                Toast.makeText(context, "❌ Erreur récupération villages", Toast.LENGTH_SHORT).show()
-                Log.e("AppViewModel", "❌ Exception fetchVillages", e)
-            }
+    // 🔹 Récupération des infos utilisateur
+    fun getUserInfo(context: Context): Flow<UserInfo> {
+        return context.dataStore.data.map { prefs ->
+            UserInfo(
+                username = prefs[stringPreferencesKey("username")],
+                email = prefs[stringPreferencesKey("email")],
+                role = prefs[stringPreferencesKey("role")],
+                status = prefs[stringPreferencesKey("status")],
+                createdAt = prefs[stringPreferencesKey("created_at")]
+            )
         }
     }
 
+    data class UserInfo(
+        val username: String?,
+        val email: String?,
+        val role: String?,
+        val status: String?,
+        val createdAt: String?
+    )
     // ------------------ SEARCH ENTREPOT ------------------
     private val _entrepots = MutableStateFlow<List<Warehouse>>(emptyList())
     val entrepots: StateFlow<List<Warehouse>> = _entrepots
@@ -150,17 +147,6 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
                 _entrepots.value = emptyList()
                 Log.e("AppViewModel", "❌ Exception fetchEntrepots", e)
             }
-        }
-    }
-
-
-    fun addEntrepot(context: Context, entrepot: Entrepot) = viewModelScope.launch {
-        try {
-            repository.insertEntrepot(entrepot)
-            Toast.makeText(context, "✅ Entrepôt ajouté localement", Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) {
-            Toast.makeText(context, "❌ Erreur ajout entrepôt", Toast.LENGTH_SHORT).show()
-            Log.e("AppViewModel", "❌ Erreur insertEntrepot", e)
         }
     }
 
@@ -449,108 +435,12 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
         )
     )
 
-
-//    private val _currentBeneficiary = MutableStateFlow(
-//        Beneficiary(
-//            idBen = 0L,
-//            villageIdF = 0,
-//            codeVillageF = "",
-//            idSprojF = 0,
-//            benStatus = "",
-//            sequences = "",
-//            profileStatusId = 0,
-//            maritalStatusId = 0,
-//            handicap = "OUI",
-//            humanStatusId = 0,
-//            dateEnregistrement = "",
-//            codeBenef = "",
-//            phone = "",
-//            prenom = "",
-//            nom = "",
-//            postnom = "",
-//            age = 0,
-//            sexe = "",
-//            numCarteBen = "",
-//            chefMenage = "NON",
-//            enfantChefMenage = "NON",
-//            repondantPresent = "NON",
-//            lienRepondant = "",
-//            repondantNoms = "",
-//            activityStatus = "",
-//            tailleMenage = 0,
-//            enfants6_17Ecole = 0,
-//            handicapeDansMenage = "NON",
-//            personneAgeeDansMenage = "NON",
-//            maladeChroniqueDansMenage = "NON",
-//            enfantMalnutriDansMenage = "NON",
-//            scoreVulnerabiliteMembreMenage = 0,
-//            sourceRevenusPrincipale = "",
-//            autresSourceRevenuDansMenage = "",
-//            habitationMenage = "NON",
-//            toit = "",
-//            mur = "NON",
-//            sol = "NON",
-//            nbrePieces = 0,
-//            nbrePrsParPiece = 0,
-//            proprietaireParcelle = "NON",
-//            scoreHabitation = 0,
-//            accesToilettes = "NON",
-//            distanceAccesToilettes = 0,
-//            accesEauPotable = "NON",
-//            scoreWASH = 0,
-//            campagneAgricolePrecedente = "NON",
-//            produitsCultives = "",
-//            nbreSacsRecoltes = 0,
-//            autresInfos = "",
-//            nbreChamps = 0,
-//            nbreChampsAgricoles = 0,
-//            nbreMaisons = 0,
-//            nbreCases = 0,
-//            nbreHoues = 0,
-//            nbreCharettes = 0,
-//            nbreMotos = 0,
-//            nbreVelos = 0,
-//            nbreBovins = 0,
-//            nbreOvins = 0,
-//            nbreCaprins = 0,
-//            nbreVolails = 0,
-//            grosElevage = "NON",
-//            scoreBiensMenage = 0,
-//            nbreRepasParJour = 0,
-//            nbreConsommationAlimentsNonPreferes7jrs = 0,
-//            aidePourManger7jrs = "NON",
-//            empruntsPourManger7jrs = 0,
-//            diminuerQuantiteRepas7jrs = 0,
-//            limiterConsommationAdultes7jrs = 0,
-//            diminuerNbreRepas7jrs = 0,
-//            nbreUtiliserEnfantPourManger = 0,
-//            autresInfosAlimentation = "",
-//            scoreAlimentation = 0,
-//            commentairesSuggestions = "",
-//            numTicket = "",
-//            geopointBen = "",
-//            remarkBen = "",
-//            photo = null,
-//            auteur = "",
-//            qrCode = null,
-//            scoreStatutMatrim = 0,
-//            scoreDemographique = 0,
-//            scoreFinal = 0,
-//            isSynced = false,
-//            latitude = "0",
-//            longitude = "0",
-//            altitude = "0.0",
-//            precision = "0.0"
-//        )
-//    )
-
     val currentBeneficiary: StateFlow<Beneficiary> = _currentBeneficiary
 
     @RequiresApi(Build.VERSION_CODES.O)
     fun updateBeneficiary(update: Beneficiary) {
         _currentBeneficiary.value = update
     }
-
 
     // ------------------ API ------------------
     @RequiresApi(Build.VERSION_CODES.O)
@@ -802,37 +692,83 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
-    // ------------------ SITES ------------------
-//    private val _sites = MutableStateFlow<List<Site>>(emptyList())
-//    val sites: StateFlow<List<Site>> = _sites
+    private val _selectedSite = mutableStateOf<SiteEntity?>(null)
+    val selectedSite: State<SiteEntity?> = _selectedSite
 
-//    private val _selectedSite = mutableStateOf<Site?>(null)
-//    val selectedSite: State<Site?> = _selectedSite
-//
-//    fun selectSite(site: Site) {
-//        _selectedSite.value = site
-//        Log.i("AppViewModel", "🏭 Site sélectionné : ${site.nameWarehouse}")
-//    }
-//
-//    fun clearSelectedSite() {
-//        _selectedSite.value = null
-//    }
+    fun selectSite(site: SiteEntity) {
+        _selectedSite.value = site
+        _currentDistribution.value = _currentDistribution.value.copy(siteId = site.warehouseId)
+    }
 
-//    fun fetchSites(context: Context) {
+    fun clearSelectedSite() {
+        _selectedSite.value = null
+        _currentDistribution.value = _currentDistribution.value.copy(siteId = 0)
+    }
+
+    // 🔹 Sites depuis Room
+    val sites: StateFlow<List<SiteEntity>> = repository.getSitesLocal()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // 🔹 Villages depuis Room
+    val villages: StateFlow<List<Village>> = repository.getVillagesLocal()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    // 🔹 Distributions depuis Room
+    val distributions: StateFlow<List<Distribution>> = repository.getAllDistributionsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+
+
+//    private val _sites = MutableStateFlow<List<SiteEntity>>(emptyList())
+//    val sites: StateFlow<List<SiteEntity>> = _sites
+//
+//    // StateFlow pour exposer les villages
+//    private val _villages = MutableStateFlow<List<Village>>(emptyList())
+//    val villages: StateFlow<List<Village>> = _villages
+//
+//    // ------------------ LECTURE LOCALE ------------------
+//    fun loadSitesLocal() {
 //        viewModelScope.launch {
-//            try {
-//                val list = repository.fetchSites()
+//            repository.getSitesLocal().collect { list ->
+//                Log.d("SyncViewModel", "📥 Sites loaded from Room: ${list.size}")
 //                _sites.value = list
-//                Toast.makeText(context, "✅ ${list.size} sites récupérés", Toast.LENGTH_SHORT).show()
-//            } catch (e: Exception) {
-//                _sites.value = emptyList()
-//                Toast.makeText(context, "❌ Erreur récupération sites", Toast.LENGTH_SHORT).show()
-//                Log.e("AppViewModel", "❌ Exception fetchSites", e)
 //            }
 //        }
 //    }
+//
+//    fun loadVillagesLocal() {
+//        viewModelScope.launch {
+//            repository.getVillagesLocal().collect { list ->
+//                Log.d("SyncViewModel", "📥 Villages loaded from Room: ${list.size}")
+//                _villages.value = list
+//            }
+//        }
+//    }
+//
+//    // ------------------ STATE FLOWS ------------------
+//    private val _distributions = MutableStateFlow<List<Distribution>>(emptyList())
+//    val distributions: StateFlow<List<Distribution>> = _distributions
+//
+//    fun loadDistributions() = viewModelScope.launch {
+//        repository.distributions.collect { list ->
+//            _distributions.value = list   // ✅ ici tu peux réassigner
+//        }
+//    }
 
-    // ------------------ DISTRIBUTION ------------------
+    // ------------------ VILLAGES ------------------
+    private val _selectedVillage = mutableStateOf<ApiVillage?>(null)
+    val selectedVillage: State<ApiVillage?> = _selectedVillage
+
+    fun selectVillage(village: ApiVillage) {
+        _selectedVillage.value = village
+        Log.i("AppViewModel", "🏡 Village sélectionné : ${village.name_village}")
+    }
+
+    fun clearSelectedVillage() {
+        _selectedVillage.value = null
+    }
+
+    // Distribution en cours d’édition
     private val _currentDistribution = MutableStateFlow(
         Distribution(
             siteId = 40,
@@ -860,50 +796,47 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
     )
     val currentDistribution: StateFlow<Distribution> = _currentDistribution
 
-    fun updateDistribution(updated: Distribution) {
-        _currentDistribution.value = updated
-    }
+    // Message UI
+    private val _uiMessage = MutableStateFlow<String?>(null)
+    val uiMessage: StateFlow<String?> = _uiMessage
 
-    private val _distributions = MutableStateFlow<List<Distribution>>(emptyList())
-    val distributions: StateFlow<List<Distribution>> = _distributions
-
-    // ------------------ Mapping vers API ------------------
-    fun Distribution.toRequest() = DistributionRequest(
-        fullname = nomComplet,
-        gender = sexe,
-        phone = phone,
-        numberOfChildren = tailleMenage,
-        photo = image,
-        landArea = superficie,
-        seed = "Mais",
-        fertilizer = "dap",
-        maizeQty = kgMais,
-        riceQty = kgRiz,
-        cassavaQty = kgManioc,
-        soybeanQty = kgSoja,
-        dapQty = kgDap,
-        kclQty = kgKcl,
-        ureeQty = kgUree,
-        npk = kgNpk,
-        suggestion = suggestion,
-        warehouseId = siteId,
-//        beneficiarieId = beneficiarieId,
-        usersId = usersId,
-        latitudeWrhs = latitude?.toDoubleOrNull(),
-        longitudeWrhs = longitude?.toDoubleOrNull(),
-        altitudeWrhs = altitude?.toDoubleOrNull(),
-        precisionWrhs = precision?.toDoubleOrNull()
-    )
-
-    // ------------------ Options semences/engrais ------------------
-    // ViewModel
+    // Options semences/engrais
     private val _options = mutableStateMapOf(
         "Riz" to false, "Maïs" to false, "Manioc" to false, "Soja" to false,
         "DAP" to false, "KCL" to false, "Urée" to false, "NPK" to false
     )
 
+    // ------------------ DISTRIBUTIONS ------------------
+
+    fun updateDistribution(updated: Distribution) {
+        _currentDistribution.value = updated
+    }
+
+    fun saveDistributionLocal() = viewModelScope.launch {
+        repository.saveDistributionLocal(_currentDistribution.value)
+//        loadDistributions()
+    }
+
+    fun sendDistribution() = viewModelScope.launch {
+        try {
+            val success = repository.createDistributionRemote(_currentDistribution.value)
+            val message = if (success) "✅ Distribution envoyée avec succès"
+            else "⚠️ Erreur lors de l'envoi"
+            Log.i("DistributionViewModel", message)
+            if (success)
+            _uiMessage.value = message
+        } catch (e: Exception) {
+            Log.e("DistributionViewModel", "❌ Exception sendDistribution", e)
+            _uiMessage.value = "❌ Exception lors de l'envoi"
+        }
+    }
+
+    fun clearUiMessage() { _uiMessage.value = null }
+
+    // ------------------ OPTIONS SEMENCES/ENGRAIS ------------------
+
     fun updateOption(option: String, checked: Boolean, kgValue: Int) {
-        Log.d("AppViewModel", "updateOption: option=$option, checked=$checked, kgValue=$kgValue")
+        Log.d("DistributionViewModel", "updateOption: option=$option, checked=$checked, kgValue=$kgValue")
         _options[option] = checked
 
         val current = _currentDistribution.value
@@ -922,27 +855,17 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
         }
 
         _currentDistribution.value = updated
-        Log.d("AppViewModel", "currentDistribution updated: $updated")
+        Log.d("DistributionViewModel", "currentDistribution updated: $updated")
     }
 
     fun getOptionState(option: String): Boolean {
         val state = _options[option] ?: false
-        Log.v("AppViewModel", "getOptionState: option=$option, state=$state")
+        Log.v("DistributionViewModel", "getOptionState: option=$option, state=$state")
         return state
     }
 
+    // ------------------ IMAGE ------------------
 
-    // ------------------ Persistance Room ------------------
-    fun saveDistribution() = viewModelScope.launch {
-        repository.saveDistribution(_currentDistribution.value)
-        loadDistributions()
-    }
-
-    fun loadDistributions() = viewModelScope.launch {
-        _distributions.value = repository.getDistributions()
-    }
-
-    // ------------------ Image ------------------
     fun updateImage(path: String) {
         val file = File(path.toUri().path ?: "")
         val base64Image = file.takeIf { it.exists() }?.readBytes()?.let {
@@ -955,105 +878,123 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
         _currentDistribution.value = _currentDistribution.value.copy(image = null)
     }
 
-    fun sendDistribution(context: Context) {
+    // 🔹 Télécharger sites + villages depuis API → Room
+    fun downloadSitesAndVillages() {
         viewModelScope.launch {
-            try {
-                val request = _currentDistribution.value.toRequest()
-                val success = repository.createDistribution(context, request)
+            val sites = repository.syncSitesFromApi()
+            val villages = repository.syncVillagesFromApi()
+            // éventuellement afficher un Toast ou un Snackbar
+        }
+    }
 
-                val message = if (success) {
-                    "✅ Distribution envoyée avec succès"
+    // ------------------ SYNCHRONISATION ------------------
+    fun syncSitesFromApi() {
+        viewModelScope.launch {
+            val count = repository.syncSitesFromApi()
+            Log.i("SyncViewModel", "🌐 Synced $count sites from API → Room")
+        }
+    }
+
+    fun syncVillagesFromApi() {
+        viewModelScope.launch {
+            val count = repository.syncVillagesFromApi()
+            Log.i("SyncViewModel", "🌐 Synced $count villages from API → Room")
+        }
+    }
+
+    fun pushUnsyncedDistributions() = viewModelScope.launch {
+        repository.pushUnsyncedDistributions()
+    }
+
+
+    // ------------------ ACTIONS API (compilées) ------------------
+
+    fun syncDistribution(action: String, d: Distribution) = viewModelScope.launch {
+        when (action) {
+            "create" -> repository.createDistributionRemote(d)
+            "update" -> repository.updateDistributionRemote(d)
+            "delete" -> repository.deleteDistributionRemote(d)
+        }
+    }
+
+    // ------------------ SYNC ALL DATA ------------------
+    private val _progress = MutableStateFlow(0f)
+    val progress: StateFlow<Float> = _progress
+
+    private val _currentStepLabel = MutableStateFlow<String?>(null)
+    val currentStepLabel: StateFlow<String?> = _currentStepLabel
+
+    private val _syncResults = MutableStateFlow<List<SyncResult>>(emptyList())
+    val syncResults: StateFlow<List<SyncResult>> = _syncResults
+
+    // ✅ Ajout du flag de synchronisation
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing
+
+    private val _syncEvent = MutableSharedFlow<Unit>()
+    val syncEvent: SharedFlow<Unit> = _syncEvent
+
+    private val totalSteps = 4
+
+    fun syncAllData() {
+        viewModelScope.launch {
+            // 🔹 Démarrage
+            _isSyncing.value = true
+            _progress.value = 0f
+            val results = mutableListOf<SyncResult>()
+
+            try {
+                _currentStepLabel.value = "📤 Push distributions"
+                results += repository.pushUnsyncedDistributions()
+                _progress.value = 1f / totalSteps
+
+                _currentStepLabel.value = "🌐 Sync sites"
+                results += repository.syncSitesFromApi()
+                _progress.value = 2f / totalSteps
+
+                _currentStepLabel.value = "🌐 Sync villages"
+                results += repository.syncVillagesFromApi()
+                _progress.value = 3f / totalSteps
+
+                _currentStepLabel.value = "📥 Sync distributions"
+                results += repository.fetchDistributionsFromApi()
+                _progress.value = 1f
+
+                _syncResults.value = results
+                _currentStepLabel.value = null
+
+                val errors = results.filter { it.errorMessage != null }
+                _uiMessage.value = if (errors.isEmpty()) {
+                    "🎯 Synchronisation terminée avec succès"
                 } else {
-                    "⚠️ Erreur lors de l'envoi de la distribution"
+                    "⚠️ Synchronisation terminée avec erreurs:\n" +
+                            errors.joinToString("\n") { it.errorMessage ?: "" }
                 }
 
-                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                Log.i("AppViewModel", message)
+                // 🔹 Résumé global en log
+                val totalSuccess = results.sumOf { it.success }
+                val totalFailed = results.sumOf { it.failed }
+                val totalPending = results.sumOf { it.pending }
 
-                // ⚡ Optionnel : recharger les distributions locales après envoi
-                if (success) loadDistributions()
-
-            } catch (e: Exception) {
-                Toast.makeText(context, "❌ Exception lors de l'envoi", Toast.LENGTH_SHORT).show()
-                Log.e("AppViewModel", "❌ Exception sendDistribution", e)
+                Log.i(
+                    "Synchronization",
+                    """
+                ================== SYNC SUMMARY ==================
+                Steps exécutés : ${results.size}
+                Total pending   : $totalPending
+                Total success   : $totalSuccess
+                Total failed    : $totalFailed
+                --------------------------------------------------
+                Détails :
+                ${results.joinToString("\n") { "🔹 ${it.step}: pending=${it.pending}, success=${it.success}, failed=${it.failed}" }}
+                ==================================================
+                """.trimIndent()
+                )
+            } finally {
+                // 🔹 Arrêt
+                _isSyncing.value = false
+                _syncEvent.emit(Unit) // ✅ signal unique
             }
         }
     }
-
-    private val _sitesRoom = MutableStateFlow<List<SiteEntity>>(emptyList())
-    val sitesRoom: StateFlow<List<SiteEntity>> = _sitesRoom
-
-//    fun loadSitesLocal() {
-//        viewModelScope.launch {
-//            repository.getSitesLocal().collect {
-//                _sitesRoom.value = it
-//            }
-//        }
-//    }
-
-    fun fetchSitesFromApi(context: Context) {
-        viewModelScope.launch {
-            val list = repository.fetchSitesFromApi()
-            _sitesRoom.value = list
-            Toast.makeText(context, "✅ ${list.size} sites enregistrés", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-//    private val _sites = MutableStateFlow<List<SiteEntity>>(emptyList())
-//    val sites: StateFlow<List<SiteEntity>> = _sites
-//
-//    fun fetchSites(context: Context) {
-//        viewModelScope.launch {
-//            try {
-//                val list = repository.fetchSites()
-//                _sites.value = list
-//                Toast.makeText(context, "✅ ${list.size} sites enregistrés", Toast.LENGTH_SHORT).show()
-//            } catch (e: Exception) {
-//                _sites.value = emptyList()
-//                Toast.makeText(context, "❌ Erreur récupération sites", Toast.LENGTH_SHORT).show()
-//            }
-//        }
-//    }
-//
-//    fun loadSitesLocal() {
-//        viewModelScope.launch {
-//            repository.getSitesLocal().collect {
-//                _sites.value = it
-//            }
-//        }
-//    }
-
-
-    private val _sites = MutableStateFlow<List<SiteEntity>>(emptyList())
-    val sites: StateFlow<List<SiteEntity>> = _sites
-
-    private val _selectedSite = mutableStateOf<SiteEntity?>(null)
-    val selectedSite: State<SiteEntity?> = _selectedSite
-
-    fun selectSite(site: SiteEntity) {
-        _selectedSite.value = site
-        _currentDistribution.value = _currentDistribution.value.copy(siteId = site.warehouseId)
-    }
-
-    fun clearSelectedSite() {
-        _selectedSite.value = null
-        _currentDistribution.value = _currentDistribution.value.copy(siteId = 0)
-    }
-
-    fun fetchSites(context: Context) {
-        viewModelScope.launch {
-            val list = repository.fetchSitesFromApi()
-            _sites.value = list
-            Toast.makeText(context, "✅ ${list.size} sites enregistrés", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    fun loadSitesLocal() {
-        viewModelScope.launch {
-            repository.getSitesLocal().collect {
-                _sites.value = it
-            }
-        }
-    }
-
 }

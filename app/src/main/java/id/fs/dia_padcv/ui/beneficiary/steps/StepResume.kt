@@ -27,7 +27,6 @@ import id.fs.dia_padcv.ui.utils.QrCodeView
 import id.fs.dia_padcv.ui.utils.generateQrCode
 import id.fs.dia_padcv.ui.utils.saveQrToGallery
 
-@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun StepResume(viewModel: AppViewModel, onSubmit: (() -> Unit)? = null) {
     val beneficiary by viewModel.currentBeneficiary.collectAsState()

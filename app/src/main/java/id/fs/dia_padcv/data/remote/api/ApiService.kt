@@ -11,10 +11,10 @@ import retrofit2.http.Query
 data class ApiResponse(
     val status: String,
     val message: String,
-    val data: List<User>
+    val data: List<UserData>
 )
 
-data class User(
+data class UserData(
     val username: String,
     val password_hash: String,
     val role: String?
@@ -222,6 +222,8 @@ data class DistributionResponse(
     val data: Any? = null
 )
 
+data class DistributionDeleteRequest( val idDistribution: Long )
+
 data class DistributionDto(
     @SerializedName("fullname") val fullname: String,
     @SerializedName("gender") val gender: String,
@@ -293,6 +295,15 @@ interface ApiService {
     @POST("survey_dist/creates.php")
     suspend fun createDistribution(
         @Body distribution: DistributionRequest
+    ): Response<DistributionResponse>
+
+    @POST("survey_dist/update.php")
+    suspend fun updateDistribution(
+        @Body distribution: DistributionRequest
+    ): Response<DistributionResponse>
+    @POST("survey_dist/delete.php")
+    suspend fun deleteDistribution(
+        @Body deleteRequest: DistributionDeleteRequest
     ): Response<DistributionResponse>
 
     @GET("survey_dist/read")

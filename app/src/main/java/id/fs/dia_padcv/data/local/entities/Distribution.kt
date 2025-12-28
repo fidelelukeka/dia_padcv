@@ -3,6 +3,7 @@ package id.fs.dia_padcv.data.local.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+enum class SyncStatus { PENDING, SYNCED, FAILED }
 
 @Entity(tableName = "distributions")
 data class Distribution(
@@ -59,5 +60,10 @@ data class Distribution(
 
     // 🔗 Liens backend
     @ColumnInfo(name = "beneficiarie_id") val beneficiarieId: Int? = null,
-    @ColumnInfo(name = "users_id") val usersId: Int = 0
+    @ColumnInfo(name = "users_id") val usersId: Int = 0,
+
+    // Métadonnées locales
+    @ColumnInfo(name = "sync_status") val syncStatus: SyncStatus = SyncStatus.PENDING,
+    @ColumnInfo(name = "last_modified") val lastModified: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "remote_id") val remoteId: Long? = null
 )

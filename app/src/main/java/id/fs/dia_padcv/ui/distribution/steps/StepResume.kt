@@ -132,13 +132,10 @@ fun StepResume(viewModel: AppViewModel, onSubmit: (() -> Unit)? = null) {
         Button(
             onClick = {
                 // 🔹 Sauvegarde en Room locale
-                viewModel.saveDistribution()
-
-                // 🔹 Sauvegarde via Exposed (si tu utilises encore cette logique)
-//                viewModel.saveDistributionToDb(distribution)
+                viewModel.saveDistributionLocal()
 
                 // 🔹 Envoi vers l’API
-                viewModel.sendDistribution(context)
+                viewModel.sendDistribution()
 
                 // 🔹 Callback éventuel
                 onSubmit?.invoke()

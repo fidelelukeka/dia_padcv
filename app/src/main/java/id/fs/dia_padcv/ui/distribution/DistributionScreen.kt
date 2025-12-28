@@ -11,16 +11,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -29,10 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import id.fs.dia_padcv.ui.AppViewModel
-import id.fs.dia_padcv.ui.beneficiary.steps.StepAlimentation
-import id.fs.dia_padcv.ui.beneficiary.steps.StepAutresInformations
-import id.fs.dia_padcv.ui.beneficiary.steps.StepBiensMateriels
-import id.fs.dia_padcv.ui.beneficiary.steps.StepCommentairesEtScores
+import id.fs.dia_padcv.ui.components.AppScaffold
 import id.fs.dia_padcv.ui.components.StepNavigationBar
 import id.fs.dia_padcv.ui.distribution.steps.StepCommentairesSuggestion
 import id.fs.dia_padcv.ui.distribution.steps.StepDistributionEngrais
@@ -49,6 +43,8 @@ fun DistributionScreen(
     onBack: () -> Unit
 ) {
     var currentStep by remember { mutableIntStateOf(1) }
+    val uiMessage by viewModel.uiMessage.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val animatedProgress by animateFloatAsState(
         targetValue = currentStep / 6f,
@@ -58,17 +54,18 @@ fun DistributionScreen(
         )
     )
 
+    LaunchedEffect(uiMessage) {
+        uiMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearUiMessage()
+        }
+    }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Formulaire bénéficiaire") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(imageVector = Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Retour")
-                    }
-                }
-            )
+    AppScaffold(
+        title = "Formulaire bénéficiaire",
+        onBack = onBack,
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
         },
         bottomBar = {
             StepNavigationBar(
