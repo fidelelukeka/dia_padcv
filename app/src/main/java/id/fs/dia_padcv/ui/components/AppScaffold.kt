@@ -4,26 +4,30 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.luminance
+import com.google.accompanist.systemuicontroller.rememberSystemUiController
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppScaffold(
     title: String,
+    snackbarHostState: SnackbarHostState, // ✅ injecté par l’écran
     onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
-    snackbarHost: @Composable () -> Unit = {},
     bottomBar: @Composable () -> Unit = {},
     content: @Composable (PaddingValues) -> Unit
 ) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val useDarkIcons = primaryColor.luminance() > 0.5f
+    val systemUiController = rememberSystemUiController()
+
+    SideEffect {
+        systemUiController.setStatusBarColor(primaryColor, darkIcons = useDarkIcons)
+        systemUiController.setNavigationBarColor(primaryColor, darkIcons = useDarkIcons)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -41,12 +45,12 @@ fun AppScaffold(
                 },
                 actions = actions,
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
+                    containerColor = primaryColor,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
         },
-        snackbarHost = snackbarHost,
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }, // ✅ affichage centralisé
         bottomBar = bottomBar,
         content = content
     )

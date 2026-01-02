@@ -77,7 +77,8 @@ fun BeneficiaryScreen(
                 currentStep = currentStep,
                 totalSteps = 10,
                 onPrevious = { if (currentStep > 1) currentStep-- },
-                onNext = { if (currentStep < 10) currentStep++ }
+                onNext = { if (currentStep < 10) currentStep++ },
+                validateStep = { step -> viewModel.validateDistribution(step) }
             )
         }
     ) { padding ->

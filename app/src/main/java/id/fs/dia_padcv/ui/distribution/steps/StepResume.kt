@@ -1,15 +1,19 @@
 package id.fs.dia_padcv.ui.distribution.steps
 
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.util.Base64
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -18,8 +22,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -30,23 +37,35 @@ import id.fs.dia_padcv.ui.components.SummaryItem
 import id.fs.dia_padcv.ui.utils.QrCodeView
 import id.fs.dia_padcv.ui.utils.generateQrCode
 import id.fs.dia_padcv.ui.utils.saveQrToGallery
+import java.io.File
+import androidx.core.net.toUri
 
 @Composable
-fun StepResume(viewModel: AppViewModel, onSubmit: (() -> Unit)? = null) {
+fun StepResume(
+    viewModel: AppViewModel,
+    onSuccess: (() -> Unit)? = null // ✅ callback déclenché après succès
+) {
     val distribution by viewModel.currentDistribution.collectAsState()
     val context = LocalContext.current
 
-    // QR Code basé sur Distribution
     val qrData = """
     {
-      "idDistribution": ${distribution.idDistribution},
-      "nomComplet": "${distribution.nomComplet}",
-      "sexe": "${distribution.sexe}",
-      "phone": "${distribution.phone ?: ""}",
-      "siteId": ${distribution.siteId}
+      "id": ${distribution.idDistribution},
+      "Nom Complet": "${distribution.nomComplet}",
+      "Sexe": "${distribution.sexe}",
+      "Phone": "${distribution.phone ?: ""}",
+      "Riz : ${distribution.hasRiz} - ${distribution.kgRiz} kg",
+      "Maïs : ${distribution.hasMais} - ${distribution.kgMais} kg",
+      "Manioc : ${distribution.hasManioc} - ${distribution.kgManioc} kg",
+      "Soja : ${distribution.hasSoja} - ${distribution.kgSoja} kg",
+      "DAP : ${distribution.hasDap} - ${distribution.kgDap} kg",
+      "KCL : ${distribution.hasKcl} - ${distribution.kgKcl} kg",
+      "Urée : ${distribution.hasUree} - ${distribution.kgUree} kg",
+      "NPK : ${distribution.hasNpk} - ${distribution.kgNpk} kg",
+      "Superficie cultivée (ha) : ${distribution.superficie}",
+      "Commentaire : ${distribution.suggestion}"
     }
     """.trimIndent()
-    val qrBitmap = remember(qrData) { generateQrCode(qrData) }
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -61,21 +80,16 @@ fun StepResume(viewModel: AppViewModel, onSubmit: (() -> Unit)? = null) {
 
         HorizontalDivider()
 
+        // --- QR Code ---
+        StepTitle("QR Code")
+        QrCodeView(data = qrData, context, distribution)
+
         // --- Identité ---
         StepTitle("Identité")
         SummaryItem("Nom complet", distribution.nomComplet)
         SummaryItem("Sexe", distribution.sexe)
         SummaryItem("Téléphone", distribution.phone ?: "")
         SummaryItem("Taille ménage", distribution.tailleMenage)
-
-        // --- QR Code ---
-        StepTitle("QR Code")
-        QrCodeView(data = qrData)
-        Button(onClick = {
-            saveQrToGallery(context, qrBitmap, "distribution_qr_${distribution.idDistribution}.png")
-        }) {
-            Text("Sauvegarder le QR")
-        }
 
         // --- Localisation GPS ---
         StepTitle("Localisation")
@@ -85,24 +99,36 @@ fun StepResume(viewModel: AppViewModel, onSubmit: (() -> Unit)? = null) {
         SummaryItem("Précision", distribution.precision ?: "")
 
         // --- Photo enregistrée ---
-        if (!distribution.image.isNullOrEmpty()) {
-            StepTitle("Photo")
-            val imageBitmap = remember(distribution.image) {
-                try {
-                    val bytes = Base64.decode(distribution.image, Base64.DEFAULT)
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-                } catch (e: Exception) {
-                    null
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            contentAlignment = Alignment.Center
+        ){
+            if (!distribution.image.isNullOrEmpty()) {
+                StepTitle("Photo")
+
+                val imageBitmap = remember(distribution.image) {
+                    try {
+                        val file = File(distribution.image!!.toUri().path ?: "")
+                        BitmapFactory.decodeFile(file.absolutePath)?.asImageBitmap()
+                    } catch (e: Exception) {
+                        null
+                    }
                 }
-            }
-            imageBitmap?.let {
-                Image(
-                    bitmap = it,
-                    contentDescription = "Photo de la distribution",
-                    modifier = Modifier
-                        .size(200.dp)
-                        .padding(top = 8.dp)
-                )
+
+                imageBitmap?.let {
+                    Image(
+                        bitmap = it,
+                        contentDescription = "Photo de la distribution",
+                        modifier = Modifier
+                            .fillMaxWidth(1f)   // ✅ largeur = 90%
+                            .fillMaxHeight(0.5f)  // ✅ hauteur = 50%
+                            .clip(RoundedCornerShape(16.dp))
+                            .padding(top = 8.dp),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             }
         }
 
@@ -128,22 +154,22 @@ fun StepResume(viewModel: AppViewModel, onSubmit: (() -> Unit)? = null) {
         StepTitle("Commentaires")
         SummaryItem("Suggestions", distribution.suggestion)
 
-        // Bouton soumission
+        // --- Bouton soumission ---
         Button(
             onClick = {
-                // 🔹 Sauvegarde en Room locale
-                viewModel.saveDistributionLocal()
-
-                // 🔹 Envoi vers l’API
-                viewModel.sendDistribution()
-
-                // 🔹 Callback éventuel
-                onSubmit?.invoke()
+                viewModel.saveDistributionLocal { idLocal ->
+                    viewModel.setUiMessage("✅ Distribution enregistrée dans la base de données locale")
+                    viewModel.setUiMessage("⏳ Envoi en cours... à l'API")
+                    if (idLocal != null) {
+                        onSuccess?.invoke()
+                    } else {
+                        viewModel.setUiMessage("❌ Erreur lors de la sauvegarde locale")
+                    }
+                }
             },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Soumettre la distribution")
         }
-
     }
 }

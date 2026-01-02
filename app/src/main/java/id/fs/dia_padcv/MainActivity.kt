@@ -13,6 +13,7 @@ import androidx.navigation.compose.rememberNavController
 import id.fs.dia_padcv.data.local.database.AppDatabase
 import id.fs.dia_padcv.data.repository.AppRepository
 import id.fs.dia_padcv.ui.AppViewModel
+import id.fs.dia_padcv.ui.theme.DIA_PADCVTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,10 +36,13 @@ class MainActivity : ComponentActivity() {
 
             val navController = rememberNavController()
 
-            AppNavHost(
-                navController = navController,
-                appViewModel = appViewModel
-            )
+            // ✅ Appliquer ton thème ici
+            DIA_PADCVTheme {
+                AppNavHost(
+                    navController = navController,
+                    appViewModel = appViewModel
+                )
+            }
         }
     }
 }

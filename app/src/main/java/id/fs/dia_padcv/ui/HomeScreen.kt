@@ -14,20 +14,41 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import id.fs.dia_padcv.ui.components.AppScaffold
+import id.fs.dia_padcv.ui.theme.Dune
+import id.fs.dia_padcv.ui.theme.Nutmeg
+import id.fs.dia_padcv.ui.theme.RipeLemon
+import id.fs.dia_padcv.ui.theme.Sycamore
 
 @Composable
 fun HomeScreen(
     navController: NavHostController,
+    viewModel : AppViewModel
 ) {
     val buttonShape = RoundedCornerShape(8.dp)
 
+    val uiMessage by viewModel.uiMessage.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiMessage) {
+        uiMessage?.let { message ->
+            snackbarHostState.showSnackbar(message) // ✅ déclenche sur l’état de l’écran
+            viewModel.clearUiMessage()
+        }
+    }
+
     AppScaffold(
-        title = "Accueil"
+        title = "Accueil",
+        snackbarHostState = snackbarHostState,
     ) { innerPadding ->
         LazyVerticalGrid(
             columns = GridCells.Fixed(2), // ✅ toujours 2 colonnes en portrait
@@ -49,13 +70,12 @@ fun HomeScreen(
                 )
             }
 
-            // ✅ Utilisation des couleurs M3 baseline
             item {
                 Button(
                     onClick = { navController.navigate("beneficiaire") },
                     modifier = Modifier.fillMaxWidth().height(80.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary,
+                        containerColor = MaterialTheme.colorScheme.secondary, // Cardinal (Rouge)
                         contentColor = MaterialTheme.colorScheme.onSecondary
                     ),
                     shape = buttonShape
@@ -70,11 +90,11 @@ fun HomeScreen(
                 Button(
                     onClick = { navController.navigate("distributions") },
                     modifier = Modifier.fillMaxWidth().height(80.dp),
-                    shape = buttonShape,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
+                        containerColor = MaterialTheme.colorScheme.primary, // DodgerBlue (Bleu)
                         contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
+                    ),
+                    shape = buttonShape
                 ) {
                     Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Distributions")
                     Spacer(Modifier.width(8.dp))
@@ -84,13 +104,10 @@ fun HomeScreen(
 
             item {
                 Button(
-                    onClick = {
-                        Log.d("Navigation", "Bouton Entrepôt cliqué")
-                        navController.navigate("entrepot")
-                    },
+                    onClick = { navController.navigate("entrepot") },
                     modifier = Modifier.fillMaxWidth().height(80.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiary,
+                        containerColor = MaterialTheme.colorScheme.tertiary, // FireBush (Orange)
                         contentColor = MaterialTheme.colorScheme.onTertiary
                     ),
                     shape = buttonShape
@@ -106,8 +123,8 @@ fun HomeScreen(
                     onClick = { navController.navigate("package") },
                     modifier = Modifier.fillMaxWidth().height(80.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError
+                        containerColor = MaterialTheme.colorScheme.primaryContainer, // Jaune vif
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ),
                     shape = buttonShape
                 ) {
@@ -122,7 +139,7 @@ fun HomeScreen(
                     onClick = { navController.navigate("sync") },
                     modifier = Modifier.fillMaxWidth().height(80.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer, // Vert olive
                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                     ),
                     shape = buttonShape
@@ -138,8 +155,8 @@ fun HomeScreen(
                     onClick = { navController.navigate("profile") },
                     modifier = Modifier.fillMaxWidth().height(80.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        containerColor = MaterialTheme.colorScheme.error, // Marron
+                        contentColor = MaterialTheme.colorScheme.onError
                     ),
                     shape = buttonShape
                 ) {

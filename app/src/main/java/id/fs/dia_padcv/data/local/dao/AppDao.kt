@@ -2,13 +2,15 @@ package id.fs.dia_padcv.data.local.dao
 
 import androidx.room.*
 import id.fs.dia_padcv.data.local.entities.*
-import id.fs.dia_padcv.data.local.relations.*
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertDistribution(distribution: Distribution)
+    suspend fun insertDistribution(distribution: Distribution): Long
+
+    @Query("SELECT * FROM distributions WHERE idDistribution = :id LIMIT 1")
+    suspend fun getDistributionById(id: Long): Distribution?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAllDistributions(list: List<Distribution>) // ⚡ c’est cette signature qu’on doit confirmer
@@ -43,7 +45,6 @@ interface AppDao {
 
     @Delete
     suspend fun deleteDistribution(distribution: Distribution)
-
 
     // Référentiels (read-only côté app)
     @Query("SELECT * FROM villages ORDER BY id_village ASC")

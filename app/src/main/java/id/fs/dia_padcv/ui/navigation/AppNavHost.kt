@@ -1,3 +1,4 @@
+import android.content.Context
 import android.content.res.Configuration
 import android.util.Log
 import androidx.compose.foundation.layout.*
@@ -16,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -31,7 +33,22 @@ fun AppNavHost(
     navController: NavHostController,
     appViewModel: AppViewModel
 ) {
-    NavHost(navController = navController, startDestination = "login") {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+    val isFirstLaunch = prefs.getBoolean("isFirstLaunch", true)
+
+    NavHost(
+        navController = navController,
+        startDestination = if (isFirstLaunch) "permissions" else "login"
+    ) {
+
+        composable("permissions") {
+            PermissionScreen {
+                navController.navigate("login") {
+                    popUpTo("login") { inclusive = true }
+                }
+            }
+        }
         // -------- LOGIN --------
         composable("login") {
             LoginScreen(viewModel = appViewModel) {
@@ -53,6 +70,7 @@ fun AppNavHost(
         composable("home") {
             HomeScreen(
                 navController = navController,
+                viewModel = appViewModel
             )
         }
 
@@ -65,9 +83,16 @@ fun AppNavHost(
 
         // -------- DISTRIBUTIONS --------
         composable("distributions") {
-            DistributionScreen(viewModel = appViewModel) {
-                navController.popBackStack()
-            }
+            DistributionScreen(
+                viewModel = appViewModel,
+                onBack = { navController.popBackStack() },
+                onSuccess = {
+                    // ✅ Redirection après succès
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = true }
+                    }
+                }
+            )
         }
 
         // -------- ENTREPOT --------

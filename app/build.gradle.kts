@@ -182,4 +182,6 @@ dependencies {
 
     // Data Store
     implementation(libs.androidx.datastore.preferences)
+
+    implementation(libs.accompanist.systemuicontroller)
 }

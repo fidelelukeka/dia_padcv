@@ -2,11 +2,9 @@ package id.fs.dia_padcv.data.repository
 
 import android.content.Context
 import android.util.Log
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
 import androidx.datastore.preferences.protobuf.LazyStringArrayList.emptyList
+import com.google.gson.Gson
 import id.fs.dia_padcv.data.local.dao.AppDao
-import id.fs.dia_padcv.data.local.relations.*
 import kotlinx.coroutines.flow.Flow
 
 // Entités locales Room
@@ -16,21 +14,17 @@ import id.fs.dia_padcv.data.local.entities.Distribution
 import id.fs.dia_padcv.data.local.entities.Entrepot
 import id.fs.dia_padcv.data.local.entities.SiteEntity
 import id.fs.dia_padcv.data.local.entities.SyncStatus
-import id.fs.dia_padcv.data.local.entities.User as LocalUser
 import id.fs.dia_padcv.data.local.entities.Village as VillageEntity
 
 // Classes API
 import id.fs.dia_padcv.data.remote.api.Village as ApiVillage
-import id.fs.dia_padcv.data.remote.api.ApiResponse
-import id.fs.dia_padcv.data.remote.api.ApiService
 import id.fs.dia_padcv.data.remote.api.BeneficiaryRequest
 import id.fs.dia_padcv.data.remote.api.ColisRequest
-import id.fs.dia_padcv.data.remote.api.ColisResponse
 import id.fs.dia_padcv.data.remote.api.DistributionDeleteRequest
 import id.fs.dia_padcv.data.remote.api.DistributionListResponse
 import id.fs.dia_padcv.data.remote.api.DistributionRequest
+import id.fs.dia_padcv.data.remote.api.DistributionResponse
 import id.fs.dia_padcv.data.remote.api.WarehouseRequest
-import id.fs.dia_padcv.data.remote.api.WarehouseResponse
 import id.fs.dia_padcv.data.remote.api.RetrofitClient
 import id.fs.dia_padcv.data.remote.api.Site
 import id.fs.dia_padcv.data.remote.api.UserData
@@ -145,7 +139,7 @@ class AppRepository(private val dao: AppDao) {
             Log.d("Repository", "📂 Credentials stockés: username=${creds.first}, passwordHash=${creds.second}")
             Log.d("Repository", "🔎 Comparaison: attendu username=$username, passwordHash=$passwordHash")
 
-            return if (creds.first == username && creds.second == passwordHash) {
+            return if (creds.first == username.trim() && creds.second == passwordHash.trim()) {
                 Log.d("Repository", "✅ Login offline réussi: $username")
                 LoginResult.Success(UserData(username, passwordHash, "offline"))
             } else {
@@ -205,122 +199,143 @@ class AppRepository(private val dao: AppDao) {
     val distributions: Flow<List<Distribution>> = dao.getAllDistributionsFlow()
 
 
-    // ------------------ MAPPINGS ------------------
-    fun Distribution.toRequest(): DistributionRequest = DistributionRequest(
-        fullname = nomComplet,
-        gender = sexe,
-        phone = phone,
-        numberOfChildren = tailleMenage,
-        photo = image,
-        landArea = superficie,
-        seed = "Mais", // ⚡ exemple
-        fertilizer = "dap",
-        maizeQty = kgMais,
-        riceQty = kgRiz,
-        cassavaQty = kgManioc,
-        soybeanQty = kgSoja,
-        dapQty = kgDap,
-        kclQty = kgKcl,
-        ureeQty = kgUree,
-        npk = kgNpk,
-        suggestion = suggestion,
-        warehouseId = siteId,
-        usersId = usersId,
-        latitudeWrhs = latitude?.toDoubleOrNull(),
-        longitudeWrhs = longitude?.toDoubleOrNull(),
-        altitudeWrhs = altitude?.toDoubleOrNull(),
-        precisionWrhs = precision?.toDoubleOrNull()
-    )
+    // ------------------ MAPPINGS -----------------
+    // Helpers pour labels seed/fertilizer si l’API les attend sous forme de chaînes
+    private fun Distribution.buildSeedLabel(): String? {
+        val list = mutableListOf<String>()
+        if (hasMais == "OUI" && kgMais > 0) list.add("maïs")
+        if (hasRiz == "OUI" && kgRiz > 0) list.add("riz")
+        if (hasManioc == "OUI" && kgManioc > 0) list.add("cassava")
+        if (hasSoja == "OUI" && kgSoja > 0) list.add("soybean")
+        return list.joinToString(",").ifBlank { null }
+    }
 
-    fun Distribution.toApiRequestForCreate(): DistributionRequest = toRequest()
-    fun Distribution.toApiRequestForUpdate(): DistributionRequest = toRequest()
-    fun Distribution.toApiDeleteRequest(): DistributionDeleteRequest =
-        DistributionDeleteRequest(idDistribution = remoteId ?: idDistribution)
+    private fun Distribution.buildFertilizerLabel(): String? {
+        val list = mutableListOf<String>()
+        if (hasDap == "OUI" && kgDap > 0) list.add("DAP")
+        if (hasKcl == "OUI" && kgKcl > 0) list.add("KCL")
+        if (hasUree == "OUI" && kgUree > 0) list.add("Urée")
+        if (hasNpk == "OUI" && kgNpk > 0) list.add("NPK")
+        return list.joinToString(",").ifBlank { null }
+    }
 
-    // ------------------ LOCAL SAVE ------------------
-    suspend fun saveDistributionLocal(d: Distribution) {
+
+    // Request -> Entity (pour insert en Room après fetch GET)
+    // ===================== MAPPER =====================
+    fun Distribution.toRequest(): DistributionRequest {
+        return DistributionRequest(
+            fullname = nomComplet.ifBlank { throw IllegalArgumentException("fullname obligatoire") },
+            gender = sexe.ifBlank { throw IllegalArgumentException("gender obligatoire") },
+            phone = phone ?: throw IllegalArgumentException("phone obligatoire"),
+            numberOfChildren = tailleMenage.takeIf { it > 0 } ?: throw IllegalArgumentException("numberofchildren obligatoire"),
+            photo = image ?: throw IllegalArgumentException("photo obligatoire"),
+            landArea = superficie,
+            seed = buildSeedLabel() ?: throw IllegalArgumentException("seed obligatoire"),
+            fertilizer = buildFertilizerLabel() ?: throw IllegalArgumentException("fertilizer obligatoire"),
+            maizeQty = kgMais,
+            riceQty = kgRiz,
+            cassavaQty = kgManioc,
+            soybeanQty = kgSoja,
+            dapQty = kgDap,
+            kclQty = kgKcl,
+            ureeQty = kgUree,
+            npk = kgNpk,
+            suggestion = suggestion,
+            warehouseId = if (siteId > 0) siteId else 40,
+            usersId = 12,
+            latitudeWrhs = latitude?.toDoubleOrNull() ?: -4.3256,
+            longitudeWrhs = longitude?.toDoubleOrNull() ?: 15.3222,
+            altitudeWrhs = altitude?.toDoubleOrNull() ?: 312.5,
+            precisionWrhs = precision?.toDoubleOrNull() ?: 5.0
+        )
+    }
+
+    suspend fun saveDistributionLocal(d: Distribution): Long {
         val stamped = d.copy(syncStatus = SyncStatus.PENDING, lastModified = now())
-        dao.insertDistribution(stamped)
-        Log.d("DistributionRepo", "💾 Distribution locale enregistrée (PENDING): idLocal=${stamped.idDistribution}")
+        val idLocal = dao.insertDistribution(stamped) // ⚡ insert renvoie Long
+        Log.d("DistributionRepo", "💾 Distribution locale enregistrée (PENDING): idLocal=$idLocal")
+        return idLocal
     }
+    suspend fun createDistributionRemote(idLocal: Long): Boolean {
+        val d = dao.getDistributionById(idLocal)
+            ?: return false.also { Log.e("DistributionRepo", "❌ Distribution introuvable en Room pour idLocal=$idLocal") }
 
-    // ------------------ CREATE ------------------
-    suspend fun createDistributionRemote(d: Distribution): Boolean {
+        Log.d("DistributionRepo", "💾 Distribution locale (avant envoi): $d")
         return try {
-            val response = api.createDistribution(d.toApiRequestForCreate())
-            val success = response.isSuccessful && response.body()?.status.equals("success", true)
+            val request = d.toRequest() // ⚡ Validation ici
+
+            // 🔹 Log exhaustif pour comparer avec le JSON attendu
+            Log.d("DistributionRepo", """
+        📋 Mapping toRequest():
+        {
+            fullname=${request.fullname}
+            gender=${request.gender}
+            phone=${request.phone}
+            numberofchildren=${request.numberOfChildren}
+            photo=${request.photo}
+            landarea=${request.landArea}
+            seed=${request.seed}
+            fertilizer=${request.fertilizer}
+            maize_qty=${request.maizeQty}
+            rice_qty=${request.riceQty}
+            cassava_qty=${request.cassavaQty}
+            soybean_qty=${request.soybeanQty}
+            dap_qty=${request.dapQty}
+            kcl_qty=${request.kclQty}
+            uree_qty=${request.ureeQty}
+            npk=${request.npk}
+            suggestion=${request.suggestion}
+            warehouse_id=${request.warehouseId}
+            users_id=${request.usersId}
+            latitude_wrhs=${request.latitudeWrhs}
+            longitude_wrhs=${request.longitudeWrhs}
+            altitude_wrhs=${request.altitudeWrhs}
+            precision_wrhs=${request.precisionWrhs}
+        }
+        """.trimIndent())
+
+            val jsonPayload = Gson().toJson(request)
+            Log.d("DistributionRepo", "📤 JSON envoyé au serveur (CREATE): $jsonPayload")
+
+            val response = api.createDistribution(request)
+
+            // 🔹 Log complet de la réponse API
+            Log.d("DistributionRepo", "📥 Réponse brute API: ${response.raw()}")
+            Log.d("DistributionRepo", "📥 Body API: ${response.body()}")
+
+            val body: DistributionResponse? = response.body()
+
+            // 🔹 Log exhaustif de la réponse décodée
+            Log.d("DistributionRepo", """
+        📥 Réponse API décodée:
+        success=${body?.success}
+        message=${body?.message}
+        beneficiary_id=${body?.beneficiary_id}
+        distribution_id=${body?.distribution_id}
+        """.trimIndent())
+
+            val success = response.isSuccessful && body?.success == true
 
             if (success) {
-                val remoteId = (response.body()?.data as? Long)
+                val remoteId = body.distribution_id?.toLongOrNull()
                 dao.markDistributionSynced(d.idDistribution, SyncStatus.SYNCED, now(), remoteId)
-                Log.i("DistributionRepo", "✅ Distribution créée sur API et marquée SYNCED")
+                Log.i("DistributionRepo", "✅ Distribution créée sur API et marquée SYNCED (remoteId=$remoteId)")
             } else {
                 dao.markDistributionFailed(d.idDistribution, SyncStatus.FAILED, now())
-                Log.w("DistributionRepo", "⚠️ Erreur création distribution: ${response.code()}")
+                Log.w("DistributionRepo", "⚠️ Échec création distribution: success=${body?.success}, message=${body?.message}")
             }
             success
-        } catch (e: Exception) {
+        } catch (e: IllegalArgumentException) {
+            Log.e("DistributionRepo", "❌ Champs obligatoires manquants: ${e.message}")
             dao.markDistributionFailed(d.idDistribution, SyncStatus.FAILED, now())
+            false
+        } catch (e: Exception) {
             Log.e("DistributionRepo", "❌ Exception createDistributionRemote", e)
-            false
-        }
-    }
-
-    // ------------------ UPDATE ------------------
-    suspend fun updateDistributionRemote(d: Distribution): Boolean {
-        return try {
-            val response = api.updateDistribution(d.toApiRequestForUpdate())
-            val success = response.isSuccessful && response.body()?.status.equals("success", true)
-
-            if (success) {
-                dao.markDistributionSynced(d.idDistribution, SyncStatus.SYNCED, now(), d.remoteId)
-                Log.i("DistributionRepo", "✅ Distribution mise à jour sur API et marquée SYNCED")
-            } else {
-                dao.markDistributionFailed(d.idDistribution, SyncStatus.FAILED, now())
-                Log.w("DistributionRepo", "⚠️ Erreur update distribution: ${response.code()}")
-            }
-            success
-        } catch (e: Exception) {
             dao.markDistributionFailed(d.idDistribution, SyncStatus.FAILED, now())
-            Log.e("DistributionRepo", "❌ Exception updateDistributionRemote", e)
             false
         }
     }
-
-    // ------------------ DELETE ------------------
-    suspend fun deleteDistributionRemote(d: Distribution): Boolean {
-        return try {
-            val response = api.deleteDistribution(d.toApiDeleteRequest())
-            val success = response.isSuccessful && response.body()?.status.equals("success", true)
-
-            if (success) {
-                dao.deleteDistribution(d)
-                Log.i("DistributionRepo", "✅ Distribution supprimée sur API et en local")
-            } else {
-                Log.w("DistributionRepo", "⚠️ Erreur delete distribution: ${response.code()}")
-            }
-            success
-        } catch (e: Exception) {
-            Log.e("DistributionRepo", "❌ Exception deleteDistributionRemote", e)
-            false
-        }
-    }
-    // ------------------ VILLAGES ------------------
-
-    // Lecture locale
-    fun getVillagesLocal(): Flow<List<VillageEntity>> {
-        Log.d("VillageRepo", "📥 Fetching villages from Room")
-        return dao.getAllVillages()
-    }
-// ------------------ SITES ------------------
-
-    // Lecture locale (toujours utilisée par l’UI)
-    fun getSitesLocal(): Flow<List<SiteEntity>> {
-        Log.d("SiteRepo", "📥 Fetching sites from Room")
-        return dao.getAllSites()
-    }
-
-    // ------------------ PUSH UNSYNCED ------------------
+    // ------------------ PUSH (CREATE/UPDATE) ------------------
     suspend fun pushUnsyncedDistributions(): SyncResult {
         val pending = dao.getUnsyncedDistributions()
         Log.i("Synchronization", "🔎 Found ${pending.size} unsynced distributions")
@@ -330,19 +345,30 @@ class AppRepository(private val dao: AppDao) {
 
         for (d in pending) {
             Log.d("Synchronization", "➡️ Processing distribution localId=${d.idDistribution}, remoteId=${d.remoteId}")
-            val ok = if (d.remoteId == null) {
-                Log.d("Synchronization", "🆕 Creating new distribution on API for localId=${d.idDistribution}")
-                createDistributionRemote(d)
-            } else {
-                Log.d("Synchronization", "♻️ Updating distribution remoteId=${d.remoteId}")
-                updateDistributionRemote(d)
-            }
-            if (ok) {
-                success++
-                Log.i("Synchronization", "✅ Distribution synced successfully (localId=${d.idDistribution})")
-            } else {
+
+            try {
+                val request = d.toRequest()
+                Log.d("Synchronization", "📤 Payload JSON: ${Gson().toJson(request)}")
+
+                val ok = createDistributionRemote(idLocal = d.idDistribution)
+
+                if (ok) {
+                    success++
+                    Log.i("Synchronization", "✅ Distribution synced successfully (localId=${d.idDistribution})")
+                    dao.markDistributionSynced(d.idDistribution, SyncStatus.SYNCED, now(), d.remoteId)
+                } else {
+                    failed++
+                    Log.w("Synchronization", "❌ Failed to sync distribution (localId=${d.idDistribution})")
+                    dao.markDistributionFailed(d.idDistribution, SyncStatus.FAILED, now())
+                }
+            } catch (e: IllegalArgumentException) {
                 failed++
-                Log.w("Synchronization", "❌ Failed to sync distribution (localId=${d.idDistribution})")
+                Log.e("Synchronization", "❌ Invalid distribution (localId=${d.idDistribution}): ${e.message}")
+                dao.markDistributionFailed(d.idDistribution, SyncStatus.FAILED, now())
+            } catch (e: Exception) {
+                failed++
+                Log.e("Synchronization", "❌ Unexpected error syncing distribution (localId=${d.idDistribution})", e)
+                dao.markDistributionFailed(d.idDistribution, SyncStatus.FAILED, now())
             }
         }
 
@@ -357,33 +383,19 @@ class AppRepository(private val dao: AppDao) {
         )
     }
 
-    // ------------------ FETCH DISTRIBUTIONS ------------------
-    suspend fun fetchDistributionsFromApi(): SyncResult {
-        Log.i("Synchronization", "🌐 Starting fetch distributions from API")
-        return try {
-            val response = api.getDistributions()
-            if (response.isSuccessful) {
-                val body = response.body() as? DistributionListResponse
-                val distributions = body?.data ?: emptyList()
+    // ------------------ VILLAGES ------------------
 
-                Log.d("Synchronization", "📦 Received ${distributions.size} distributions from API")
+    // Lecture locale
+    fun getVillagesLocal(): Flow<List<VillageEntity>> {
+        Log.d("VillageRepo", "📥 Fetching villages from Room")
+        return dao.getAllVillages()
+    }
+// ------------------ SITES ------------------
 
-                dao.insertAllDistributions(distributions as List<Distribution>)
-                Log.i("Synchronization", "✅ Distributions saved to Room: ${distributions.size}")
-
-                SyncResult(
-                    step = "Distributions (fetch)",
-                    success = distributions.size,
-                    errorMessage = if (distributions.isEmpty()) "⚠️ Aucune distribution reçue" else null
-                )
-            } else {
-                Log.w("Synchronization", "⚠️ API error while fetching distributions: code=${response.code()}")
-                SyncResult(step = "Distributions (fetch)", errorMessage = "⚠️ API error: code=${response.code()}")
-            }
-        } catch (e: Exception) {
-            Log.e("Synchronization", "❌ Exception during distributions fetch", e)
-            SyncResult(step = "Distributions (fetch)", errorMessage = "❌ Exception: ${e.message}")
-        }
+    // Lecture locale (toujours utilisée par l’UI)
+    fun getSitesLocal(): Flow<List<SiteEntity>> {
+        Log.d("SiteRepo", "📥 Fetching sites from Room")
+        return dao.getAllSites()
     }
 
     // ------------------ VILLAGES ------------------

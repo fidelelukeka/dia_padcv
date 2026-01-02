@@ -23,7 +23,7 @@ import id.fs.dia_padcv.data.local.entities.*
         User::class,
         SiteEntity::class
     ],
-    version = 16,
+    version = 18,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

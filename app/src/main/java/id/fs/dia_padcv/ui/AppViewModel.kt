@@ -1,8 +1,5 @@
 package id.fs.dia_padcv.ui
 
-// Entités locales Room
-
-// Classes API
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
@@ -26,11 +23,10 @@ import id.fs.dia_padcv.data.local.entities.Colis
 import id.fs.dia_padcv.data.local.entities.Distribution
 import id.fs.dia_padcv.data.local.entities.Entrepot
 import id.fs.dia_padcv.data.local.entities.SiteEntity
+import id.fs.dia_padcv.data.local.entities.SyncStatus
 import id.fs.dia_padcv.data.local.entities.Village
 import id.fs.dia_padcv.data.remote.api.BeneficiaryRequest
 import id.fs.dia_padcv.data.remote.api.ColisRequest
-import id.fs.dia_padcv.data.remote.api.DistributionDeleteRequest
-import id.fs.dia_padcv.data.remote.api.DistributionRequest
 import id.fs.dia_padcv.data.remote.api.RetrofitClient
 import id.fs.dia_padcv.data.remote.api.Warehouse
 import id.fs.dia_padcv.data.remote.api.WarehouseRequest
@@ -38,11 +34,11 @@ import id.fs.dia_padcv.data.repository.AppRepository
 import id.fs.dia_padcv.ui.utils.LoginResult
 import id.fs.dia_padcv.ui.utils.SyncResult
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -50,7 +46,6 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.time.LocalDate
 import id.fs.dia_padcv.data.remote.api.Village as ApiVillage
-
 
 class AppViewModel(private val repository: AppRepository) : ViewModel() {
 
@@ -63,6 +58,8 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
 
     private val _loginError = mutableStateOf<String?>(null)
     val loginError: State<String?> = _loginError
+
+    private val now: () -> Long = { System.currentTimeMillis() }
 
     fun login(context: Context, username: String, password: String) {
         viewModelScope.launch {
@@ -717,44 +714,6 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
     val distributions: StateFlow<List<Distribution>> = repository.getAllDistributionsFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-
-
-//    private val _sites = MutableStateFlow<List<SiteEntity>>(emptyList())
-//    val sites: StateFlow<List<SiteEntity>> = _sites
-//
-//    // StateFlow pour exposer les villages
-//    private val _villages = MutableStateFlow<List<Village>>(emptyList())
-//    val villages: StateFlow<List<Village>> = _villages
-//
-//    // ------------------ LECTURE LOCALE ------------------
-//    fun loadSitesLocal() {
-//        viewModelScope.launch {
-//            repository.getSitesLocal().collect { list ->
-//                Log.d("SyncViewModel", "📥 Sites loaded from Room: ${list.size}")
-//                _sites.value = list
-//            }
-//        }
-//    }
-//
-//    fun loadVillagesLocal() {
-//        viewModelScope.launch {
-//            repository.getVillagesLocal().collect { list ->
-//                Log.d("SyncViewModel", "📥 Villages loaded from Room: ${list.size}")
-//                _villages.value = list
-//            }
-//        }
-//    }
-//
-//    // ------------------ STATE FLOWS ------------------
-//    private val _distributions = MutableStateFlow<List<Distribution>>(emptyList())
-//    val distributions: StateFlow<List<Distribution>> = _distributions
-//
-//    fun loadDistributions() = viewModelScope.launch {
-//        repository.distributions.collect { list ->
-//            _distributions.value = list   // ✅ ici tu peux réassigner
-//        }
-//    }
-
     // ------------------ VILLAGES ------------------
     private val _selectedVillage = mutableStateOf<ApiVillage?>(null)
     val selectedVillage: State<ApiVillage?> = _selectedVillage
@@ -768,20 +727,19 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
         _selectedVillage.value = null
     }
 
-    // Distribution en cours d’édition
     private val _currentDistribution = MutableStateFlow(
         Distribution(
-            siteId = 40,
+            siteId = 0,
             nomComplet = "",
             sexe = "",
             phone = "",
-            image = "",
-            tailleMenage = 1,
-            superficie = "2.5",
-            latitude = "-4.3235",
-            longitude = "15.2987",
-            altitude = "350",
-            precision = "5",
+            image = null,
+            tailleMenage = 0,
+            superficie = 0,
+            latitude = "",
+            longitude = "",
+            altitude = "",
+            precision = "",
             kgMais = 0,
             kgRiz = 0,
             kgManioc = 0,
@@ -790,11 +748,12 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
             kgKcl = 0,
             kgUree = 0,
             kgNpk = 0,
-            suggestion = "teste API ok vieux",
-            usersId = 2
+            suggestion = "",
+            usersId = 0
         )
     )
     val currentDistribution: StateFlow<Distribution> = _currentDistribution
+
 
     // Message UI
     private val _uiMessage = MutableStateFlow<String?>(null)
@@ -811,58 +770,123 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
     fun updateDistribution(updated: Distribution) {
         _currentDistribution.value = updated
     }
-
-    fun saveDistributionLocal() = viewModelScope.launch {
-        repository.saveDistributionLocal(_currentDistribution.value)
-//        loadDistributions()
-    }
-
-    fun sendDistribution() = viewModelScope.launch {
+    // ===================== SAVE LOCAL =====================
+    fun saveDistributionLocal(onResult: (Long?) -> Unit) = viewModelScope.launch {
         try {
-            val success = repository.createDistributionRemote(_currentDistribution.value)
-            val message = if (success) "✅ Distribution envoyée avec succès"
-            else "⚠️ Erreur lors de l'envoi"
-            Log.i("DistributionViewModel", message)
-            if (success)
-            _uiMessage.value = message
+            val distribution = _currentDistribution.value
+
+            // 🔹 Sauvegarde locale avec statut PENDING
+            val stamped = distribution.copy(syncStatus = SyncStatus.PENDING, lastModified = now())
+            val idLocal = repository.saveDistributionLocal(stamped) // ⚡ dao.insert renvoie l'idLocal
+
+            _uiMessage.value = "💾 Distribution sauvegardée en local (idLocal=$idLocal)"
+
+            // ✅ reset formulaire (objet vide)
+            _currentDistribution.value = Distribution(
+                siteId = 0,
+                nomComplet = "",
+                sexe = "",
+                phone = "",
+                image = "",
+                tailleMenage = 0,
+                superficie = 0,
+                latitude = "",
+                longitude = "",
+                altitude = "",
+                precision = "",
+                kgMais = 0,
+                kgRiz = 0,
+                kgManioc = 0,
+                kgSoja = 0,
+                kgDap = 0,
+                kgKcl = 0,
+                kgUree = 0,
+                kgNpk = 0,
+                suggestion = "",
+                usersId = 0
+            )
+
+            // ⚡ renvoyer l'idLocal inséré
+            onResult(idLocal)
         } catch (e: Exception) {
-            Log.e("DistributionViewModel", "❌ Exception sendDistribution", e)
-            _uiMessage.value = "❌ Exception lors de l'envoi"
+            _uiMessage.value = "❌ Erreur lors de la sauvegarde locale"
+            onResult(null)
         }
     }
+
+    // ===================== SEND REMOTE =====================
+    fun sendDistribution(idLocal: Long) = viewModelScope.launch {
+        try {
+            val success = repository.createDistributionRemote(idLocal) // ⚡ relire depuis Room
+            _uiMessage.value = if (success) {
+                "✅ Distribution envoyée avec succès"
+            } else {
+                "⚠️ Erreur lors de l'envoi, mais sauvegarde locale OK"
+            }
+        } catch (e: Exception) {
+            _uiMessage.value = "❌ Exception lors de l'envoi, mais sauvegarde locale OK"
+        }
+    }
+
 
     fun clearUiMessage() { _uiMessage.value = null }
 
     // ------------------ OPTIONS SEMENCES/ENGRAIS ------------------
-
-    fun updateOption(option: String, checked: Boolean, kgValue: Int) {
-        Log.d("DistributionViewModel", "updateOption: option=$option, checked=$checked, kgValue=$kgValue")
-        _options[option] = checked
-
-        val current = _currentDistribution.value
-        val kg = if (checked) kgValue else 0
-
-        val updated = when (option) {
-            "Riz" -> current.copy(kgRiz = kg)
-            "Maïs" -> current.copy(kgMais = kg)
-            "Manioc" -> current.copy(kgManioc = kg)
-            "Soja" -> current.copy(kgSoja = kg)
-            "DAP" -> current.copy(kgDap = kg)
-            "KCL" -> current.copy(kgKcl = kg)
-            "Urée" -> current.copy(kgUree = kg)
-            "NPK" -> current.copy(kgNpk = kg)
-            else -> current
+    fun updateOption(label: String, hasValue: Boolean, qty: Int) {
+        val dist = _currentDistribution.value
+        val newDist = when (label) {
+            "Riz" -> dist.copy(
+                hasRiz = if (hasValue) "OUI" else "NON",
+                kgRiz = if (hasValue) qty else 0
+            )
+            "Maïs" -> dist.copy(
+                hasMais = if (hasValue) "OUI" else "NON",
+                kgMais = if (hasValue) qty else 0
+            )
+            "Manioc" -> dist.copy(
+                hasManioc = if (hasValue) "OUI" else "NON",
+                kgManioc = if (hasValue) qty else 0
+            )
+            "Soja" -> dist.copy(
+                hasSoja = if (hasValue) "OUI" else "NON",
+                kgSoja = if (hasValue) qty else 0
+            )
+            "DAP" -> dist.copy(
+                hasDap = if (hasValue) "OUI" else "NON",
+                kgDap = if (hasValue) qty else 0
+            )
+            "KCL" -> dist.copy(
+                hasKcl = if (hasValue) "OUI" else "NON",
+                kgKcl = if (hasValue) qty else 0
+            )
+            "Urée" -> dist.copy(
+                hasUree = if (hasValue) "OUI" else "NON",
+                kgUree = if (hasValue) qty else 0
+            )
+            "NPK" -> dist.copy(
+                hasNpk = if (hasValue) "OUI" else "NON",
+                kgNpk = if (hasValue) qty else 0
+            )
+            else -> dist
         }
-
-        _currentDistribution.value = updated
-        Log.d("DistributionViewModel", "currentDistribution updated: $updated")
+        _currentDistribution.value = newDist
     }
 
-    fun getOptionState(option: String): Boolean {
-        val state = _options[option] ?: false
-        Log.v("DistributionViewModel", "getOptionState: option=$option, state=$state")
-        return state
+    fun getOptionState(label: String): Boolean {
+        val dist = _currentDistribution.value
+        return when (label) {
+            "Riz" -> dist.hasRiz == "OUI"
+            "Maïs" -> dist.hasMais == "OUI"
+            "Manioc" -> dist.hasManioc == "OUI"
+            "Soja" -> dist.hasSoja == "OUI"
+            "DAP" -> dist.hasDap == "OUI"
+            "KCL" -> dist.hasKcl == "OUI"
+            "Urée" -> dist.hasUree == "OUI"
+            "NPK" -> dist.hasNpk == "OUI"
+            else -> false
+        }
     }
+
 
     // ------------------ IMAGE ------------------
 
@@ -906,17 +930,6 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
         repository.pushUnsyncedDistributions()
     }
 
-
-    // ------------------ ACTIONS API (compilées) ------------------
-
-    fun syncDistribution(action: String, d: Distribution) = viewModelScope.launch {
-        when (action) {
-            "create" -> repository.createDistributionRemote(d)
-            "update" -> repository.updateDistributionRemote(d)
-            "delete" -> repository.deleteDistributionRemote(d)
-        }
-    }
-
     // ------------------ SYNC ALL DATA ------------------
     private val _progress = MutableStateFlow(0f)
     val progress: StateFlow<Float> = _progress
@@ -957,7 +970,7 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
                 _progress.value = 3f / totalSteps
 
                 _currentStepLabel.value = "📥 Sync distributions"
-                results += repository.fetchDistributionsFromApi()
+                results += repository.pushUnsyncedDistributions()
                 _progress.value = 1f
 
                 _syncResults.value = results
@@ -995,6 +1008,52 @@ class AppViewModel(private val repository: AppRepository) : ViewModel() {
                 _isSyncing.value = false
                 _syncEvent.emit(Unit) // ✅ signal unique
             }
+        }
+    }
+    fun setUiMessage(message: String?) {
+        _uiMessage.value = message
+    }
+
+    fun validateDistribution(step: Int): Boolean {
+        val d = currentDistribution.value
+
+        return when (step) {
+            1 -> { // ✅ Étape Information Géographique
+                val ok = !d.latitude.isNullOrBlank() && !d.longitude.isNullOrBlank() && d.siteId != 0 && d.image != null
+                if (!ok) setUiMessage("Veuillez remplir la localisation, sélectionner un site et prendre un photo")
+                ok
+            }
+            2 -> { // ✅ Étape Identité
+                val ok = d.nomComplet.isNotBlank() &&
+                        !d.phone.isNullOrBlank() &&
+                        d.tailleMenage > 0 &&
+                        d.sexe.isNotBlank()
+                if (!ok) setUiMessage("Veuillez remplir tous les champs d'identité")
+                ok
+            }
+            3 -> { // ✅ Étape Distribution Semence
+                val anySelected = listOf(d.kgRiz, d.kgMais, d.kgManioc, d.kgSoja).any { it > 0 }
+                val ok = anySelected && d.superficie > 0
+                if (!ok) setUiMessage("Veuillez sélectionner au moins une semence et indiquer la quantité")
+                ok
+            }
+            4 -> { // ✅ Étape Distribution Engrais
+                val anySelected = listOf(d.kgUree, d.kgKcl, d.kgDap, d.kgNpk).any { it > 0 }
+                val ok = anySelected
+                if (!ok) setUiMessage("Veuillez sélectionner au moins un engrais et indiquer la quantité")
+                ok
+            }
+            5 -> { // ✅ Étape Commentaires / Suggestions
+                val ok = d.suggestion.isNotBlank()
+                if (!ok) setUiMessage("Veuillez saisir une suggestion ou un commentaire")
+                ok
+            }
+            6 -> { // ✅ Étape Résumé
+                val ok = d.image != null
+                if (!ok) setUiMessage("Veuillez ajouter une photo avant de terminer")
+                ok
+            }
+            else -> true
         }
     }
 }

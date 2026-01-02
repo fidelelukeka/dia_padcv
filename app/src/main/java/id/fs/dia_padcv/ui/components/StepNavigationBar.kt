@@ -18,13 +18,14 @@ fun StepNavigationBar(
     currentStep: Int,
     totalSteps: Int,
     onPrevious: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
+    validateStep: (Int) -> Boolean
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
-            .padding(WindowInsets.navigationBars.asPaddingValues()), // ⚡ ajoute un espace au-dessus des boutons système
+            .padding(WindowInsets.navigationBars.asPaddingValues()),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Button(onClick = onPrevious, enabled = currentStep > 1) {
@@ -33,8 +34,11 @@ fun StepNavigationBar(
 
         Text("Étape $currentStep / $totalSteps")
 
-        Button(onClick = onNext) {
-            Text(if (currentStep == totalSteps) "Terminer" else "Suivant")
+        Button(onClick = {
+            val ok = validateStep(currentStep)
+            if (ok) onNext()
+        }, enabled = currentStep < totalSteps) {
+            Text(if (currentStep == totalSteps) "Fin, revoyer les réponses" else "Suivant")
         }
     }
 }

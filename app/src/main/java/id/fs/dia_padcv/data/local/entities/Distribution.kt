@@ -53,7 +53,7 @@ data class Distribution(
     @ColumnInfo(name = "kg_npk") val kgNpk: Int = 0,
 
     // 🌍 Superficie cultivée
-    @ColumnInfo(name = "landarea") val superficie: String = "0", // ⚡ String pour matcher API
+    @ColumnInfo(name = "landarea") val superficie: Int = 0, // ⚡ String pour matcher API
 
     // 💬 Suggestion
     @ColumnInfo(name = "suggestion") val suggestion: String,

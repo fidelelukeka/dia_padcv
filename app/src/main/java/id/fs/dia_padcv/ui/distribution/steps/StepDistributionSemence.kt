@@ -19,6 +19,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import id.fs.dia_padcv.ui.AppViewModel
 import id.fs.dia_padcv.ui.components.OuiNonCheckBox
+import id.fs.dia_padcv.ui.components.fields.RequiredNumberField
+import id.fs.dia_padcv.ui.components.fields.RequiredOptionsField
 
 
 @Composable
@@ -51,42 +53,16 @@ fun StepDistributionSemence(viewModel: AppViewModel) {
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
         )
 
-        // ✅ Superficie (champ numérique)
-        OutlinedTextField(
-            value = if (distribution.superficie.isEmpty() || distribution.superficie == "0") "" else distribution.superficie,
+        RequiredNumberField(
+            value = distribution.superficie,
             onValueChange = { viewModel.updateDistribution(distribution.copy(superficie = it)) },
-            label = { Text("Superficie cultivée (ha)") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth()
+            label = "Superficie cultivée (ha)"
         )
-
-        // 🔹 Boucle ultra-générique
-        optionsMap.forEach { (label, values) ->
-            val hasValue = values.first   // Boolean
-            val kgValue = values.second   // Int
-
-            OuiNonCheckBox(
-                label = label,
-                checked = hasValue,
-                onCheckedChange = { newHas ->
-                    Log.d("DistributionSemence", "onCheckedChange: label=$label, newHas=$newHas, currentKg=$kgValue")
-                    viewModel.updateOption(label, newHas, kgValue)
-                }
-            )
-
-            if (hasValue) {
-                OutlinedTextField(
-                    value = if (kgValue == 0) "" else kgValue.toString(),
-                    onValueChange = { qty ->
-                        val kg = qty.toIntOrNull() ?: 0
-                        Log.d("DistributionSemence", "onValueChange: label=$label, qtyInput=$qty, parsedKg=$kg")
-                        viewModel.updateOption(label, true, kg)
-                    },
-                    label = { Text("Kilogrammes de $label") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
+        RequiredOptionsField(
+            optionsMap = optionsMap,
+            onOptionChanged = { label, hasValue, kgValue ->
+                viewModel.updateOption(label, hasValue, kgValue)
             }
-        }
+        )
     }
 }

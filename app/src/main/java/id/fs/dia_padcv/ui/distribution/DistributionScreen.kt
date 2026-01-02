@@ -40,7 +40,8 @@ import id.fs.dia_padcv.ui.distribution.steps.StepResume
 @Composable
 fun DistributionScreen(
     viewModel: AppViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onSuccess: () -> Unit // ✅ nouveau callback
 ) {
     var currentStep by remember { mutableIntStateOf(1) }
     val uiMessage by viewModel.uiMessage.collectAsState()
@@ -63,17 +64,17 @@ fun DistributionScreen(
 
     AppScaffold(
         title = "Formulaire bénéficiaire",
+        snackbarHostState = snackbarHostState,
         onBack = onBack,
-        snackbarHost = {
-            SnackbarHost(hostState = snackbarHostState)
-        },
         bottomBar = {
             StepNavigationBar(
                 currentStep = currentStep,
                 totalSteps = 6,
                 onPrevious = { if (currentStep > 1) currentStep-- },
-                onNext = { if (currentStep < 6) currentStep++ }
+                onNext = { if (currentStep < 6) currentStep++ },
+                validateStep = { step -> viewModel.validateDistribution(step) }
             )
+
         }
     ) { padding ->
 
@@ -103,7 +104,7 @@ fun DistributionScreen(
                     3 -> StepDistributionSemence(viewModel)
                     4 -> StepDistributionEngrais(viewModel)
                     5 -> StepCommentairesSuggestion(viewModel)
-                    6 -> StepResume(viewModel)
+                    6 -> StepResume(viewModel, onSuccess)
                 }
             }
         }

@@ -1,6 +1,7 @@
 package id.fs.dia_padcv.data.remote.api
 
 import com.google.gson.annotations.SerializedName
+import id.fs.dia_padcv.data.local.entities.Distribution
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -192,12 +193,12 @@ data class SiteResponse(
 data class DistributionRequest(
     @SerializedName("fullname") val fullname: String,
     @SerializedName("gender") val gender: String,
-    @SerializedName("phone") val phone: String?,
-    @SerializedName("numberofchildren") val numberOfChildren: Int?,
-    @SerializedName("photo") val photo: String?,
-    @SerializedName("landarea") val landArea: String?,   // ⚡ corrigé en String
-    @SerializedName("seed") val seed: String?,
-    @SerializedName("fertilizer") val fertilizer: String?,
+    @SerializedName("phone") val phone: String,
+    @SerializedName("numberofchildren") val numberOfChildren: Int,
+    @SerializedName("photo") val photo: String,
+    @SerializedName("landarea") val landArea: Int,
+    @SerializedName("seed") val seed: String,
+    @SerializedName("fertilizer") val fertilizer: String,
     @SerializedName("maize_qty") val maizeQty: Int?,
     @SerializedName("rice_qty") val riceQty: Int?,
     @SerializedName("cassava_qty") val cassavaQty: Int?,
@@ -208,7 +209,6 @@ data class DistributionRequest(
     @SerializedName("npk") val npk: Int?,
     @SerializedName("suggestion") val suggestion: String?,
     @SerializedName("warehouse_id") val warehouseId: Int,
-//    @SerializedName("beneficiarie_id") val beneficiarieId: Int? = null, // ⚡ optionnel
     @SerializedName("users_id") val usersId: Int,
     @SerializedName("latitude_wrhs") val latitudeWrhs: Double?,
     @SerializedName("longitude_wrhs") val longitudeWrhs: Double?,
@@ -217,44 +217,18 @@ data class DistributionRequest(
 )
 
 data class DistributionResponse(
-    val status: String,
+    val success: Boolean,
     val message: String,
-    val data: Any? = null
+    val beneficiary_id: String? = null,
+    val distribution_id: String? = null
 )
 
-data class DistributionDeleteRequest( val idDistribution: Long )
-
-data class DistributionDto(
-    @SerializedName("fullname") val fullname: String,
-    @SerializedName("gender") val gender: String,
-    @SerializedName("phone") val phone: String?,
-    @SerializedName("numberofchildren") val numberOfChildren: Int?,
-    @SerializedName("photo") val photo: String?,
-    @SerializedName("landarea") val landArea: String?,
-    @SerializedName("seed") val seed: String?,
-    @SerializedName("fertilizer") val fertilizer: String?,
-    @SerializedName("maize_qty") val maizeQty: Int?,
-    @SerializedName("rice_qty") val riceQty: Int?,
-    @SerializedName("cassava_qty") val cassavaQty: Int?,
-    @SerializedName("soybean_qty") val soybeanQty: Int?,
-    @SerializedName("dap_qty") val dapQty: Int?,
-    @SerializedName("kcl_qty") val kclQty: Int?,
-    @SerializedName("uree_qty") val ureeQty: Int?,
-    @SerializedName("npk") val npk: Int?,
-    @SerializedName("suggestion") val suggestion: String?,
-    @SerializedName("warehouse_id") val warehouseId: Int,
-    @SerializedName("beneficiarie_id") val beneficiarieId: Int?,
-    @SerializedName("users_id") val usersId: Int,
-    @SerializedName("latitude_wrhs") val latitudeWrhs: Double?,
-    @SerializedName("longitude_wrhs") val longitudeWrhs: Double?,
-    @SerializedName("altitude_wrhs") val altitudeWrhs: Double?,
-    @SerializedName("precision_wrhs") val precisionWrhs: Double?
-)
+data class DistributionDeleteRequest(val idDistribution: Long)
 
 data class DistributionListResponse(
     val status: String,
     val message: String,
-    val data: List<DistributionDto>?
+    val data: List<DistributionRequest>? // ⚡ simplifié : on récupère directement des DistributionRequest
 )
 
 
@@ -294,7 +268,7 @@ interface ApiService {
 
     @POST("survey_dist/creates.php")
     suspend fun createDistribution(
-        @Body distribution: DistributionRequest
+        @Body distribution: DistributionRequest?
     ): Response<DistributionResponse>
 
     @POST("survey_dist/update.php")

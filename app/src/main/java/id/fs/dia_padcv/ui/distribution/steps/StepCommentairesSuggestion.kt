@@ -1,7 +1,5 @@
 package id.fs.dia_padcv.ui.distribution.steps
 
-import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +15,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.fs.dia_padcv.ui.AppViewModel
+import id.fs.dia_padcv.ui.components.fields.RequiredNumberField
+import id.fs.dia_padcv.ui.components.fields.RequiredTextField
 
 @Composable
 fun StepCommentairesSuggestion(viewModel: AppViewModel) {
@@ -40,12 +40,10 @@ fun StepCommentairesSuggestion(viewModel: AppViewModel) {
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
         )
 
-        // ✅ Commentaires et suggestions
-        OutlinedTextField(
+        RequiredTextField(
             value = distribution.suggestion,
             onValueChange = { viewModel.updateDistribution(distribution.copy(suggestion = it)) },
-            label = { Text("Commentaires et suggestions") },
-            modifier = Modifier.fillMaxWidth()
+            label = "Commentaires et suggestions"
         )
     }
 }

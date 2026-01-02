@@ -43,10 +43,17 @@ fun SyncScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
 
+    LaunchedEffect(uiMessage) {
+        uiMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearUiMessage()
+        }
+    }
+
     AppScaffold(
         title = "Synchronisation",
+        snackbarHostState = snackbarHostState,
         onBack = onBack,
-        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -208,7 +215,7 @@ fun SyncScreen(
                                         labelColor = MaterialTheme.colorScheme.primary
                                     )
                                 )
-                                Text("✅ Ok", color = MaterialTheme.colorScheme.secondary)
+                                Text("✅", color = MaterialTheme.colorScheme.secondary)
                             }
                             is Village -> {
                                 AssistChip(
@@ -219,7 +226,7 @@ fun SyncScreen(
                                         labelColor = MaterialTheme.colorScheme.tertiary
                                     )
                                 )
-                                Text("✅ Ok", color = MaterialTheme.colorScheme.secondary)
+                                Text("✅", color = MaterialTheme.colorScheme.secondary)
                             }
                             is Distribution -> {
                                 AssistChip(

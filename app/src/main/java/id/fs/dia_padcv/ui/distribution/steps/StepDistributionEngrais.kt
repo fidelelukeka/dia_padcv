@@ -18,6 +18,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import id.fs.dia_padcv.ui.AppViewModel
 import id.fs.dia_padcv.ui.components.OuiNonCheckBox
+import id.fs.dia_padcv.ui.components.fields.RequiredOptionsField
 
 @Composable
 fun StepDistributionEngrais(viewModel: AppViewModel) {
@@ -48,30 +49,11 @@ fun StepDistributionEngrais(viewModel: AppViewModel) {
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
         )
 
-        optionsMap.forEach { (label, values) ->
-            val hasValue = values.first   // Boolean
-            val kgValue = values.second   // Int
-
-            OuiNonCheckBox(
-                label = label,
-                checked = hasValue,
-                onCheckedChange = { newHas ->
-                    viewModel.updateOption(label, newHas, kgValue)
-                }
-            )
-
-            if (hasValue) {
-                OutlinedTextField(
-                    value = if (kgValue == 0) "" else kgValue.toString(),
-                    onValueChange = { qty ->
-                        val kg = qty.toIntOrNull() ?: 0
-                        viewModel.updateOption(label, true, kg)
-                    },
-                    label = { Text("Kilogrammes de $label") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
+        RequiredOptionsField(
+            optionsMap = optionsMap,
+            onOptionChanged = { label, hasValue, kgValue ->
+                viewModel.updateOption(label, hasValue, kgValue)
             }
-        }
+        )
     }
 }
